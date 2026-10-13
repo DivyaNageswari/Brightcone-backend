@@ -5,11 +5,12 @@ use axum::{
     http::request::Parts,
 };
 use loco_rs::prelude::*;
+use serde::Serialize;
 
 use crate::settings::AppSettings;
 
 /// Who is calling and which request this is. Stored with every audit entry.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct RequestMeta {
     pub ip: Option<String>,
     pub request_id: Option<String>,
@@ -22,11 +23,16 @@ impl FromRequestParts<AppContext> for RequestMeta {
         parts: &mut Parts,
         ctx: &AppContext,
     ) -> std::result::Result<Self, Self::Rejection> {
+        // Use the header if provided; otherwise generate one so every request has an ID.
         let request_id = parts
             .headers
             .get("x-request-id")
             .and_then(|v| v.to_str().ok())
-            .map(str::to_owned);
+            .map(str::to_owned)
+            .or_else(|| {
+                // Generate a v4-like request ID per request so logs and traces can be correlated.
+                Some(Uuid::new_v4().to_string())
+            });
 
         // The socket address cannot be faked. The header can, so it is only believed when the app
         // sits behind our own reverse proxy (`trust_proxy`), and then only its LAST entry, which is

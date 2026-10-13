@@ -1,4 +1,4 @@
-[workspace]
+﻿[workspace]
 
 [package]
 name = "brightcone-hr-backend"
@@ -42,6 +42,7 @@ include_dir = { version = "0.7" }
 utoipa = { version = "5", features = ["chrono", "uuid"] }
 sha2 = "0.10"
 governor = "0.10"
+tower-http = "0.7"
 
 [[bin]]
 name = "brightcone_hr_backend-cli"

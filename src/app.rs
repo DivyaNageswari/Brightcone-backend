@@ -10,10 +10,20 @@ use loco_rs::{
     task::Tasks,
     Result,
 };
-use migration::Migrator;
-use std::path::Path;
-
-use crate::{controllers, models::_entities::users, tasks};
+use axum::{
+    extract::{ConnectInfo, Request, State},
+    http::{header, HeaderName, HeaderValue, Method},
+    middleware::from_fn_with_state,
+    response::IntoResponse,
+    routing::post,
+};
+use loco_rs::prelude::*;
+use std::net::SocketAddr;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::compression::CompressionLayer;
+use tower_http::timeout::TimeoutLayer;
+use tower_http::set_header::SetLayer;
+use tower_http::trace::MakeSpan;
 
 pub struct App;
 #[async_trait]
@@ -44,13 +54,69 @@ impl Hooks for App {
         Ok(vec![])
     }
 
-    fn routes(ctx: &AppContext) -> AppRoutes {
-        let routes = AppRoutes::with_default_routes() // controller routes below
-            .add_route(controllers::health::routes())
-            .add_route(controllers::auth::routes(ctx))
-            .add_route(controllers::me::routes())
-            .add_route(controllers::admin_users::routes())
-            .add_route(controllers::audit_log::routes());
+    fn security_headers(_req: Request, next: Next) -> impl IntoResponse {
+    // B1.12: Security headers on every response.
+    let mut resp = next.into_response();
+    resp.headers().insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline' style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"),
+    );
+    resp.headers().insert(
+        header::STRICT_TRANSPORT_SECURITY,
+        HeaderValue::from_static("max-age=31536000; includeSubDomains; preload"),
+    );
+    resp.headers().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    resp.headers().insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    resp.headers().insert(
+        header::FRAME_ANCESTORS,
+        HeaderValue::from_static("none"),
+    );
+    resp
+}
+
+fn cors_layer() -> CorsLayer {
+    // B1.12: CORS only for our frontend, with credentials.
+    CorsLayer::new()
+        .allow_origin("http://localhost:5173".parse().unwrap())
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH])
+        .allow_headers(Any)
+        .allow_credentials(true)
+}
+
+fn body_size_limit(limit: usize) -> impl tower::Service<axum::body::Body, Error = axum::error::Infallibility> + Clone + Send + Sync + 'static {
+    // B1.12: Reject JSON bodies > 1 MB and uploads > 10 MB.
+    || async move |body: axum::body::Body| {
+        let bytes = hyper::body::to_bytes(body, limit).await.map_err(|_| axum::error::Infallibility::INFALLIBLE)?;
+        Ok::<_, axum::error::Infallibility>(bytes.into())
+    }
+}
+
+fn rate_limit_middleware(limiter: IpRateLimit) -> impl tower::Service<axum::body::Body, Error = axum::error::Infallibility> + Clone + Send + Sync + 'static {
+    || async move |req: Request| rate_limit(State(limiter.clone()), req).await
+}
+
+fn app_routes(ctx: &AppContext, rate_limiter: IpRateLimit) -> AppRoutes {
+    // B1.12: Security headers on every response.
+    let routes = AppRoutes::with_default_routes()
+        .add_route(controllers::health::routes())
+        // Wrap every route with security headers.
+        .wrap_fn(from_fn_with_state(rate_limiter.clone(), rate_limit_middleware(rate_limiter)))
+        // CORS only for our frontend with credentials.
+        .wrap(cors_layer())
+        // Compress gzip/brotli.
+        .wrap(CompressionLayer::new().gzip(true).brotli(true))
+        // Body size limits.
+        .wrap(body_size_limit(1_000_000).or(body_size_limit(10_000_000)))
+        // Request timeout: 15 s per B1.12.
+        .wrap(TimeoutLayer::new(std::time::Duration::from_secs(15)))
+        // Security headers on every response.
+        .wrap_fn(from_fn_with_state(ctx.clone(), |_req: Request, next: Next| security_headers(_req, next)))
         // API docs are for developers, so they are not served in production.
         if ctx.environment == Environment::Production {
             routes
