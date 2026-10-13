@@ -1,1 +1,1 @@
-
+pub use migration::Migrator;

@@ -1,4 +1,4 @@
-# Loco configuration file documentation
+﻿# Loco configuration file documentation
 
 # Application logging configuration
 logger:
@@ -63,7 +63,7 @@ queue:
   kind: Postgres
   
   # Postgres connection URI
-  uri: <%= get_env(name="TEST_DATABASE_URL", default="postgres://app_migrator:migrator_dev_pw@localhost:5432/brightcone_test") %>
+  uri: <%= get_env(name="TEST_DATABASE_URL", default="postgres://app_migrator:migrator_dev_pw@localhost:5433/brightcone_test") %>
   # Dangerously flush all data in the queue table on startup. dangerous operation, make sure that you using this flag only on dev environments or test mode
   dangerously_flush: false
   
@@ -95,7 +95,7 @@ mailer:
 # Database Configuration
 database:
   # Database connection URI
-  uri: <%= get_env(name="TEST_DATABASE_URL", default="postgres://app_migrator:migrator_dev_pw@localhost:5432/brightcone_test") %>
+  uri: <%= get_env(name="TEST_DATABASE_URL", default="postgres://app_migrator:migrator_dev_pw@localhost:5433/brightcone_test") %>
   # When enabled, the sql query will be logged.
   enable_logging: false
   # Set the timeout duration when acquiring a connection.
