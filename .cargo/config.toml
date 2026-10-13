@@ -1,0 +1,10 @@
+[alias]
+loco = "run --"
+loco-tool = "run --"
+
+playground = "run --example playground"
+
+# No `linker = "rust-lld"` override here on purpose. rust-lld does not discover the
+# Windows SDK import libraries (kernel32.lib, ws2_32.lib, ...) by itself, so every
+# build fails on a normal Windows machine with "could not open 'kernel32.lib'".
+# CI runs on Linux, where this override was invisible.

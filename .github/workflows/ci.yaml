@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Format, lint, test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # Same two roles and databases as local development (docker/postgres-init/01-roles.sh)
+      TEST_DATABASE_URL: postgres://app_migrator:migrator_dev_pw@localhost:5432/brightcone_test
+      DATABASE_URL: postgres://app_runtime:runtime_dev_pw@localhost:5432/brightcone_dev
+      QUEUE_URL: postgres://app_queue:queue_dev_pw@localhost:5432/brightcone_dev
+      MIGRATION_DATABASE_URL:postgres://app_migrator:migrator_dev_pw@localhost:5432/brightcone_dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the Rust version from rust-toolchain.toml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.0
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Create database roles and databases
+        run: |
+          export PGPASSWORD=postgres
+          MIGRATOR_PASSWORD=migrator_dev_pw RUNTIME_PASSWORD=runtime_dev_pw QUEUE_PASSWORD=queue_dev_pw \
+          POSTGRES_USER=postgres PGHOST=localhost bash docker/postgres-init/01-roles.sh
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-features --all-targets -- -D warnings
+
+      - name: Migrate dev database as app_migrator
+        run: DATABASE_URL="$MIGRATION_DATABASE_URL" cargo run --quiet -- db migrate
+
+      - name: App starts as the restricted app_runtime role and /api/health answers
+        run: |
+          cargo run --quiet -- start > app.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:5150/api/health && exit 0
+            sleep 2
+          done
+          cat app.log
+          exit 1
+
+      - name: Tests (includes the openapi.json up-to-date check)
+        run: cargo test --all-features
+
+      - name: Runtime role cannot change table structure
+        run: |
+          export PGPASSWORD=runtime_dev_pw
+          if psql -h localhost -U app_runtime -d brightcone_dev -c "CREATE TABLE should_fail (id int);" ; then
+            echo "app_runtime must not be able to CREATE tables"; exit 1
+          fi
+          if psql -h localhost -U app_runtime -d brightcone_dev -c "DROP TABLE users;" ; then
+            echo "app_runtime must not be able to DROP tables"; exit 1
+          fi
+
+      - name: Install cargo-audit and cargo-deny
+        run: cargo install --locked cargo-audit cargo-deny
+      - name: Security advisories
+        run: cargo audit
+      - name: Licences and sources
+        run: cargo deny check
