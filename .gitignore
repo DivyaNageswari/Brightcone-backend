@@ -26,3 +26,8 @@ seed.out
 .env
 .env.*
 !.env.example
+
+# Agent tooling that ships with the Loco generator. Not part of the product, so
+# it is never committed. See CONTRIBUTING.md for the developer guide instead.
+.claude/
+CLAUDE.md

@@ -19,18 +19,11 @@ use loco_rs::{
 };
 use std::path::Path;
 use tower_http::{
-    compression::CompressionLayer,
-    cors::CorsLayer,
-    limit::RequestBodyLimitLayer,
+    compression::CompressionLayer, cors::CorsLayer, limit::RequestBodyLimitLayer,
     timeout::TimeoutLayer,
 };
 
-use crate::{
-    controllers,
-    data::Migrator,
-    models::users,
-    tasks,
-};
+use crate::{controllers, data::Migrator, models::users, tasks};
 
 pub struct App;
 
