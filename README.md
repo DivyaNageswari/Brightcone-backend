@@ -59,6 +59,7 @@ The Vite frontend defaults to proxying `/api` to `http://localhost:5150`. Mailpi
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
+make line-limit
 ```
 
 For Docker-only backend commands, see `make help` and the Makefile. Run these checks on a clean environment before merging; native Windows dependencies can require MSVC and a writable Cargo target directory.
@@ -76,6 +77,7 @@ migration/                 ordered PostgreSQL schema changes
 config/                    development, test and production configuration
 docker/                    local PostgreSQL roles and initialization
 tests/                     API and integration tests
+scripts/                   source-size enforcement
 ```
 
 ## Security and scope

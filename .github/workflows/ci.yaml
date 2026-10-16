@@ -56,6 +56,13 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
+      - name: Source line limit
+        run: |
+          rustfmt --edition 2021 --check scripts/check_line_limits.rs
+          mkdir -p target
+          rustc --edition=2021 scripts/check_line_limits.rs -o target/check_line_limits.exe
+          target/check_line_limits.exe
+
       - name: Clippy
         run: cargo clippy --all-features --all-targets -- -D warnings
 

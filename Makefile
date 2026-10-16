@@ -2,7 +2,7 @@
 -include .env
 export
 
-.PHONY: db-up db-down db-reset migrate run seed test lint fmt openapi \
+.PHONY: db-up db-down db-reset migrate run seed test lint fmt openapi line-limit \
         docker-migrate docker-seed docker-run docker-down docker-reset
 
 db-up: ## start Postgres and the mail catcher
@@ -37,6 +37,12 @@ fmt: ## format code
 
 openapi: ## regenerate openapi.json after changing the API
 	UPDATE_OPENAPI=1 cargo test --test openapi
+
+line-limit: ## enforce the 400-line Rust source file limit
+	rustfmt --edition 2021 --check scripts/check_line_limits.rs
+	mkdir -p target
+	rustc --edition=2021 scripts/check_line_limits.rs -o target/check_line_limits.exe
+	target/check_line_limits.exe
 
 # --- the same steps with no Rust on the host (Docker only) ---------------------
 docker-migrate: ## apply migrations in Docker, as the app_migrator role

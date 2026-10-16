@@ -76,9 +76,9 @@ fn cors_layer(frontend_url: &str) -> Result<CorsLayer> {
         .authority()
         .filter(|value| !value.as_str().contains('@'))
         .ok_or_else(|| loco_rs::prelude::Error::string("FRONTEND_URL must contain a valid host"))?;
-    if uri.query().is_some() || uri.fragment().is_some() {
+    if uri.query().is_some() {
         return Err(loco_rs::prelude::Error::string(
-            "FRONTEND_URL must not contain a query or fragment",
+            "FRONTEND_URL must not contain a query",
         ));
     }
     let frontend_origin = HeaderValue::from_str(&format!("{scheme}://{authority}"))

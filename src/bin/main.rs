@@ -4,5 +4,6 @@ use migration::Migrator;
 
 #[tokio::main]
 async fn main() -> loco_rs::Result<()> {
+    let _ = dotenvy::dotenv();
     cli::main::<App, Migrator>().await
 }

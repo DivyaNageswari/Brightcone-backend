@@ -689,6 +689,7 @@ dependencies = [
  "axum",
  "axum-test",
  "chrono",
+ "dotenvy",
  "governor",
  "include_dir",
  "insta",
