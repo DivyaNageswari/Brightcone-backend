@@ -1,4 +1,5 @@
 pub mod app;
+pub mod approvals;
 pub mod audit;
 pub mod authz;
 pub mod controllers;
@@ -12,6 +13,7 @@ pub mod rate_limit;
 pub mod request_meta;
 pub mod session;
 pub mod settings;
+pub mod storage;
 pub mod tasks;
 pub mod views;
 pub mod workers;

@@ -33,16 +33,65 @@ services:
       - '1025:1025'
       - '8025:8025'
 
+  # Applies the migrations, then exits. Kept as its own service because
+  # `db migrate` connects with DATABASE_URL -- there is no separate migration URL
+  # in Loco -- so it must be told to use the migrator role. Running it through the
+  # `api` service instead fails with "permission denied for schema public",
+  # because app_runtime is deliberately not allowed to create objects.
+  #   docker compose --profile app run --rm migrate
+  migrate:
+    profiles: ['app']
+    image: rust:1
+    working_dir: /app
+    command: cargo run -- db migrate
+    environment:
+      DATABASE_URL: postgres://app_migrator:${MIGRATOR_PASSWORD:-migrator_dev_pw}@postgres:5432/brightcone_dev
+      QUEUE_URL: postgres://app_queue:${QUEUE_PASSWORD:-queue_dev_pw}@postgres:5432/brightcone_dev
+      MAILER_HOST: mailpit
+      CARGO_TARGET_DIR: /cargo-target
+    volumes:
+      - .:/app
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/cargo-target
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Prints the demo accounts and their passwords once. Refuses to run in production.
+  #   docker compose --profile app run --rm seed
+  seed:
+    profiles: ['app']
+    image: rust:1
+    working_dir: /app
+    command: cargo run -- task seed_demo
+    environment:
+      DATABASE_URL: postgres://app_runtime:${RUNTIME_PASSWORD:-runtime_dev_pw}@postgres:5432/brightcone_dev
+      QUEUE_URL: postgres://app_queue:${QUEUE_PASSWORD:-queue_dev_pw}@postgres:5432/brightcone_dev
+      MAILER_HOST: mailpit
+      CARGO_TARGET_DIR: /cargo-target
+    volumes:
+      - .:/app
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/cargo-target
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     profiles: ['app']
     image: rust:1
     working_dir: /app
-    command: cargo run -- start
+    command: cargo run -- start --server-and-worker
     environment:
       DATABASE_URL: postgres://app_runtime:${RUNTIME_PASSWORD:-runtime_dev_pw}@postgres:5432/brightcone_dev
       QUEUE_URL: postgres://app_queue:${QUEUE_PASSWORD:-queue_dev_pw}@postgres:5432/brightcone_dev
       MAILER_HOST: mailpit
       BINDING: 0.0.0.0
+      # Passed through so the container signs tokens with the same secret as a
+      # host run. Without this the container silently falls back to the
+      # development.yaml default and tokens from the two paths disagree.
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
       CARGO_TARGET_DIR: /cargo-target
     volumes:
       - .:/app

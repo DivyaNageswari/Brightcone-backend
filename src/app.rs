@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 use axum::{
     extract::Request,
-    http::{header, HeaderName, HeaderValue, Method, StatusCode},
+    http::{header, HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware::{from_fn, Next},
     response::IntoResponse,
     Router,
 };
 use loco_rs::{
     app::{AppContext, Hooks, Initializer},
-    bgworker::Queue,
+    bgworker::{BackgroundWorker, Queue},
     boot::{create_app, BootResult, StartMode},
     config::Config,
     controller::AppRoutes,
@@ -38,9 +38,7 @@ async fn security_headers(req: Request, next: Next) -> impl IntoResponse {
     headers.insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; \
-             style-src 'self' 'unsafe-inline'; img-src 'self' data:; \
-             connect-src 'self'; frame-ancestors 'none';",
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
         ),
     );
     headers.insert(
@@ -62,13 +60,31 @@ async fn security_headers(req: Request, next: Next) -> impl IntoResponse {
     resp
 }
 
-fn cors_layer() -> CorsLayer {
+fn cors_layer(frontend_url: &str) -> Result<CorsLayer> {
     // NOTE: `allow_credentials(true)` cannot be combined with `allow_headers(Any)`
     // or `allow_origin(Any)` — the CORS spec forbids the wildcard in credentialed
     // requests, and tower-http panics on that combination. So we name the exact
     // origins and headers we accept instead of using the wildcard.
-    CorsLayer::new()
-        .allow_origin(HeaderValue::from_static("http://localhost:5173"))
+    let uri = frontend_url.parse::<Uri>().map_err(|_| {
+        loco_rs::prelude::Error::string("FRONTEND_URL must be an absolute HTTP(S) URL")
+    })?;
+    let scheme = uri
+        .scheme_str()
+        .filter(|value| *value == "http" || *value == "https")
+        .ok_or_else(|| loco_rs::prelude::Error::string("FRONTEND_URL must use HTTP or HTTPS"))?;
+    let authority = uri
+        .authority()
+        .filter(|value| !value.as_str().contains('@'))
+        .ok_or_else(|| loco_rs::prelude::Error::string("FRONTEND_URL must contain a valid host"))?;
+    if uri.query().is_some() || uri.fragment().is_some() {
+        return Err(loco_rs::prelude::Error::string(
+            "FRONTEND_URL must not contain a query or fragment",
+        ));
+    }
+    let frontend_origin = HeaderValue::from_str(&format!("{scheme}://{authority}"))
+        .map_err(|_| loco_rs::prelude::Error::string("FRONTEND_URL must be a valid origin"))?;
+    Ok(CorsLayer::new()
+        .allow_origin(frontend_origin)
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -86,7 +102,7 @@ fn cors_layer() -> CorsLayer {
             HeaderName::from_static("x-csrf-token"),
         ])
         .allow_credentials(true)
-        .max_age(std::time::Duration::from_secs(3600))
+        .max_age(std::time::Duration::from_secs(3600)))
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +146,8 @@ impl Hooks for App {
             .add_route(controllers::me::routes())
             .add_route(controllers::admin_users::routes())
             .add_route(controllers::audit_log::routes());
+        // File and approvals controllers are prototypes backed by process-local registries.
+        // Keep them out of the HTTP surface until durable, tenant-scoped persistence exists.
 
         // API docs are for developers — not served in production.
         if ctx.environment != Environment::Production {
@@ -139,9 +157,10 @@ impl Hooks for App {
         routes
     }
 
-    async fn after_routes(router: Router, _ctx: &AppContext) -> Result<Router> {
+    async fn after_routes(router: Router, ctx: &AppContext) -> Result<Router> {
+        let origin = crate::settings::AppSettings::from_ctx(ctx).frontend_url;
         Ok(router
-            .layer(cors_layer())
+            .layer(cors_layer(&origin)?)
             .layer(CompressionLayer::new().gzip(true).br(true))
             .layer(RequestBodyLimitLayer::new(10_000_000))
             .layer(TimeoutLayer::with_status_code(
@@ -151,7 +170,10 @@ impl Hooks for App {
             .layer(from_fn(security_headers)))
     }
 
-    async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
+    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
+        queue
+            .register(crate::workers::cleanup::TokenCleanupWorker::build(ctx))
+            .await?;
         Ok(())
     }
 
