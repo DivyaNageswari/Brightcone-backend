@@ -1,4 +1,5 @@
 [alias]
+start = "run -- start"
 loco = "run --"
 loco-tool = "run --"
 

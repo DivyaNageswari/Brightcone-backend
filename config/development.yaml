@@ -21,7 +21,7 @@ server:
   # collide. Override without editing this file: `PORT=5151 cargo loco start`.
   port: <%= get_env(name="PORT", default="5150") %>
   # Binding for the server (which interface to bind to)
-  binding: <%= get_env(name="BINDING", default="localhost") %>
+  binding: <%= get_env(name="BINDING", default="0.0.0.0") %>
   # The UI hostname or IP address that mailers will point to.
   host: http://localhost
   # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
@@ -130,7 +130,7 @@ auth:
   jwt:
     # Secret key for token generation and verification
     # Set a locally generated value in .env; never ship a shared signing key.
-    secret: <%= get_env(name="JWT_SECRET") %>
+    secret: <%= get_env(name="JWT_SECRET", default="dGhpc19pc19hX2RldmVsb3BtZW50X3NlY3JldF9mb3JfbG9jYWxfdXNlX29ubHlfMTIzNDU2Nzg5MDEyMzQ1Ng==") %>
     # Token expiration time in seconds
     expiration: 900 # 15 minutes. The refresh cookie keeps people signed in.
     # Where to read the token from. Omitted => `Authorization: Bearer <token>`.

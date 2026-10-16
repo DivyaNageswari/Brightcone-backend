@@ -76,9 +76,9 @@ fn cors_layer(frontend_url: &str) -> Result<CorsLayer> {
         .authority()
         .filter(|value| !value.as_str().contains('@'))
         .ok_or_else(|| loco_rs::prelude::Error::string("FRONTEND_URL must contain a valid host"))?;
-    if uri.query().is_some() {
+    if uri.query().is_some() || frontend_url.contains('#') {
         return Err(loco_rs::prelude::Error::string(
-            "FRONTEND_URL must not contain a query",
+            "FRONTEND_URL must not contain a query or fragment",
         ));
     }
     let frontend_origin = HeaderValue::from_str(&format!("{scheme}://{authority}"))
@@ -159,6 +159,7 @@ impl Hooks for App {
 
     async fn after_routes(router: Router, ctx: &AppContext) -> Result<Router> {
         let origin = crate::settings::AppSettings::from_ctx(ctx).frontend_url;
+        let router = router.merge(crate::modules::domain_router());
         Ok(router
             .layer(cors_layer(&origin)?)
             .layer(CompressionLayer::new().gzip(true).br(true))
