@@ -7,3 +7,10 @@ loco-tool = "run --"
 # Windows SDK import libraries (kernel32.lib, ws2_32.lib, ...) by itself, so every
 # build fails on a normal Windows machine with "could not open 'kernel32.lib'".
 # CI runs on Linux, where this override was invisible.
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-L", "native=C:/Program Files/PostgreSQL/18/lib"]
+
+[env]
+PQ_LIB_DIR = "C:\\Program Files\\PostgreSQL\\18\\lib"
+
