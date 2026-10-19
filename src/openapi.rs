@@ -3,7 +3,9 @@ use utoipa::{
     Modify, OpenApi,
 };
 
-use crate::controllers::{admin_users, audit_log, auth, health, me};
+use crate::controllers::{
+    admin_users, audit_log, auth, exports, health, me, notifications, record_types, records, rules,
+};
 
 /// Single source of truth for the API contract. Add each new endpoint to `paths` and each
 /// request/response type to `schemas`. The committed `openapi.json` is checked by a test and by CI;
@@ -27,6 +29,22 @@ use crate::controllers::{admin_users, audit_log, auth, health, me};
         admin_users::set_role,
         admin_users::reset_password,
         audit_log::list,
+        notifications::list,
+        notifications::mark_read,
+        records::list,
+        records::create,
+        records::update,
+        records::archive,
+        records::restore,
+        records::history,
+        record_types::list,
+        exports::csv,
+        exports::backup,
+        exports::import,
+        rules::list,
+        rules::metrics,
+        rules::retry,
+        rules::update,
     ),
     components(schemas(
         crate::views::health::HealthResponse,
@@ -43,6 +61,23 @@ use crate::controllers::{admin_users, audit_log, auth, health, me};
         admin_users::TemporaryPasswordResponse,
         audit_log::AuditEntryResponse,
         audit_log::AuditPage,
+        notifications::Notification,
+        notifications::NotificationPage,
+        records::RecordInput,
+        records::RecordUpdateInput,
+        record_types::FieldSchema,
+        record_types::RecordTypeSchema,
+        record_types::RecordCatalog,
+        records::Record,
+        records::RecordPage,
+        records::HistoryEntry,
+        exports::BackupDocument,
+        exports::BackupRecord,
+        exports::BackupHistory,
+        exports::BackupImport,
+        rules::Rule,
+        rules::RuleUpdate,
+        rules::RuleMetrics,
     )),
     modifiers(&BearerAuth)
 )]

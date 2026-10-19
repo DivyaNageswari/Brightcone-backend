@@ -1,6 +1,6 @@
 use loco_rs::prelude::*;
 
-use crate::views::health::HealthResponse;
+use crate::{database::Database, views::health::HealthResponse};
 
 /// Liveness plus a database check. Used by monitoring and the frontend start page.
 /// Returns 503 when the database does not answer so load balancers stop sending traffic.
@@ -14,7 +14,17 @@ use crate::views::health::HealthResponse;
 )]
 #[debug_handler]
 pub async fn health(State(ctx): State<AppContext>) -> Result<Response> {
-    let database_up = ctx.db.ping().await.is_ok();
+    let database_up = match Database::from_context(&ctx) {
+        Ok(db) => match db.get().await {
+            Ok(mut connection) => {
+                diesel_async::SimpleAsyncConnection::batch_execute(&mut *connection, "SELECT 1")
+                    .await
+                    .is_ok()
+            }
+            Err(_) => false,
+        },
+        Err(_) => false,
+    };
     let status = if database_up { 200 } else { 503 };
     format::render()
         .status(status)

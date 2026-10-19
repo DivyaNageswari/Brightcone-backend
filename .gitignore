@@ -17,6 +17,7 @@ target/
 
 *.sqlite
 *.sqlite-*
+/storage/uploads/
 
 # Output of `make seed` / `cargo loco task seed_demo`: it prints every demo
 # password in plain text, so it must never reach Git.

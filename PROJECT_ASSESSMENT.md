@@ -55,16 +55,16 @@ There are **no active HTTP endpoints** for `/api/files` or `/api/approvals` afte
 
 ## Database schema currently present
 
-The schema below is based on the checked-in migrations. PostgreSQL extensions/types include UUID and case-insensitive email (`citext`). The Loco queue may create its own framework-managed queue tables; those are not product domain entities.
+The product schema is declared in `src/database/schema/manifest.rs` and synchronized additively at startup with Diesel. Existing databases may retain the legacy `citext` email column; queries cast it to text. The Loco queue may create its own framework-managed queue tables; those are not product domain entities.
 
 | Table | Main fields / constraints | Purpose |
 |---|---|---|
-| `users` | `id` PK, `pid` UUID, unique case-insensitive `email`, `password`, `name`, timestamps, `role`, `status`, `failed_logins`, `locked_at`, `last_login_at`, `must_change_password`, `password_changed_at`; role/status checks | Identity, credentials, account state and RBAC role. A legacy `api_key` column remains and should be removed by a migration if no consumer requires it. |
+| `users` | `id` PK, `pid` UUID, normalized unique `email`, `password`, `name`, timestamps, `role`, `status`, `failed_logins`, `locked_at`, `last_login_at`, `must_change_password`, `password_changed_at`, `api_key`; role/status checks | Identity, credentials, account state and RBAC role. |
 | `refresh_tokens` | `id` PK, `user_id` FK → users (cascade), unique `token_hash`, `family_id`, persistent flag, expiry/use/revoke timestamps, IP, creation timestamp; indexes on user/family/expiry | Hashed refresh-session state and replay detection. |
 | `password_resets` | `id` PK, `user_id` FK → users (cascade), unique `token_hash`, expiry/use/create timestamps; user index | One-time password recovery tokens. |
 | `audit_logs` | `id` PK, nullable actor id/email, action, target type/id, summary, IP, request id, timestamp; append-only trigger/privileges | Security and administrative event trail. No actor FK by design so audit history survives user deletion. |
 
-There are currently two product migrations. There are **no durable product tables** for employees beyond login users, org/team structure, leave, payroll, expenses, recruitment, documents, approvals, benefits, schedules, learning, or social feed. Before these features handle real data, define ownership/tenant boundaries, retention, indexes, audit events, and migration/rollback behavior for each domain.
+There are **no durable product tables** for employees beyond login users, org/team structure, leave, payroll, expenses, recruitment, documents, approvals, benefits, schedules, learning, or social feed. The startup sync is deliberately additive: it creates missing tables and columns, indexes, and constraints; it does not drop or rewrite existing data. Review the manifest for every schema change. Before adding HR domains, define ownership/tenant boundaries, retention, indexes, audit events, and a safe forward/backfill plan; code-driven sync does not replace data backfills or operational rollback planning.
 
 ## Jobs and background work
 
@@ -83,8 +83,8 @@ Brightcon Internship/
 │   ├── brightcone-hr-frontend/
 │   │   └── src/{api,auth,components,features,people-plus,routes,styles}/
 │   └── brightcone-hr-backend/
-│       ├── src/{controllers,dtos,initializers,mailers,models,tasks,views,workers}/
-│       ├── migration/
+│       ├── src/{controllers,dtos,mailers,models,tasks,views,workers}/
+│       ├── src/database/{schema.rs,schema/manifest.rs}
 │       ├── config/
 │       ├── tests/
 │       └── .github/workflows/
@@ -109,10 +109,10 @@ backend/src/
   domains/<domain>/     # controller, DTO, service, model/repository, policy
   jobs/                 # named jobs, schedules and retry policy
   main.rs
-backend/migration/      # forward migrations and documented rollback strategy
+backend/src/database/  # Diesel pool and additive startup schema manifest
 ```
 
-Keep controllers thin (parse/authenticate/validate/serialize), put business rules in services, database access behind repositories/models, and authorization in explicit policies. Each domain should own its DTOs, migrations, tests, and API contract. Shared code should remain small and dependency direction should flow from domain code to shared interfaces, not between unrelated feature modules.
+Keep controllers thin (parse/authenticate/validate/serialize), put business rules in services, database access behind repositories/models, and authorization in explicit policies. Each domain should own its DTOs, schema declarations, tests, and API contract. Shared code should remain small and dependency direction should flow from domain code to shared interfaces, not between unrelated feature modules.
 
 ## Running locally
 
@@ -125,22 +125,17 @@ Commands below assume PowerShell from the workspace root and Docker Desktop. Nev
    docker compose up -d --wait postgres mailpit
    ```
 
-2. Create the backend `.env` from `.env.example` and generate a unique random `JWT_SECRET` (for example, `openssl rand -base64 48`). Keep `.env` untracked. Match the database, queue, migration, and local Compose settings. Do not reuse development credentials outside an isolated local database. For the frontend, `.env.example` documents `VITE_PROXY_TARGET=http://localhost:5150` and `VITE_API_URL=/api`; copy it to the Vite env file used by the project if overrides are needed.
+2. Create the backend `.env` from `.env.example` and generate a unique random `JWT_SECRET` (for example, `openssl rand -base64 48`). Keep `.env` untracked. Set separate `DATABASE_URL` (runtime role), `SCHEMA_SYNC_DATABASE_URL` (DDL role), and `QUEUE_URL` values for the local Compose database. Do not reuse development credentials outside an isolated local database. For the frontend, `.env.example` documents `VITE_PROXY_TARGET=http://localhost:5150` and `VITE_API_URL=/api`; copy it to the Vite env file used by the project if overrides are needed.
 
-3. Apply migrations and (only for disposable local development) seed demo users:
-
-   ```powershell
-   docker compose --profile app run --rm migrate
-   docker compose --profile app run --rm seed
-   ```
-
-4. Run the API:
+3. Start the API. It syncs schema before serving requests; seed demo users only in disposable local development:
 
    ```powershell
-   cargo run
+   cargo run -- start --server-and-worker
+   # In another terminal, after schema sync completes:
+   cargo run -- task seed_demo
    ```
 
-   The API listens on `http://localhost:5150` by default.
+4. The API listens on `http://localhost:5150` by default. For Docker, run `docker compose --profile app up api` instead of the host command above.
 
 5. In another terminal, install and run the frontend:
 
@@ -176,7 +171,7 @@ Some scripts vary by the installed package manager/test runner; check `package.j
 | CORS was fixed to the Vite localhost origin | Deployed frontend origin could not call API; production environment coupling | CORS now derives origin from configured `frontend_url` and rejects invalid configuration instead of silently using localhost. |
 | Development config had a committed JWT secret fallback | Anyone with repository access could mint development tokens | Removed fallback; require locally generated secret. `.env.example` is blank for this secret. |
 | Seed credentials were present in project documentation | Unintended account access if copied/reused | Sanitized the tracked docs. **Git history may still contain old values**; rotate any credentials ever used/shared and rewrite history if required by your incident policy. |
-| CI migration URL YAML key was malformed | CI configuration could parse incorrectly | Corrected the mapping syntax. |
+| CI database URL YAML key was malformed | CI configuration could parse incorrectly | Corrected the mapping syntax. |
 | Careers UI showed unsupported role and compensation facts | Misleading product information | Replaced with neutral copy until backed by real API data. |
 | Auth E2E expected an obsolete greeting and sign-out control | Test no longer matched current interface | Updated selectors/expectations to current UI. |
 | API CSP allowed inline script/style sources | Larger injection surface for API responses | Replaced with a restrictive API-only CSP. |
@@ -192,7 +187,7 @@ These changes do not complete the suite backend or establish a security certific
 3. **Move rate limiting to shared infrastructure.** Process-local counters are bypassed by round-robin replicas/restarts. Use Redis or a gateway limiter with trusted client IP extraction and explicit key policies.
 4. **Harden password recovery against timing enumeration.** Queue mail uniformly and measure response-time distributions. Keep responses generic; avoid waiting for SMTP in the request path.
 5. **Remove reusable demo credentials from build/deploy pathways.** Rotate any credentials used outside disposable local data; use a secrets manager and non-public seed accounts. Secret-scan the repository and history in CI.
-6. **Production deployment and operations.** Current Compose is for local development, not a production orchestration plan. Pin container images, use a non-root minimal runtime image, TLS termination, managed PostgreSQL, encrypted backups, restore drills, migration job ordering, readiness/liveness probes, metrics, centralized logs, alerting, and incident procedures.
+6. **Production deployment and operations.** Current Compose is for local development, not a production orchestration plan. Pin container images, use a non-root minimal runtime image, TLS termination, managed PostgreSQL, encrypted backups, restore drills, schema-sync deployment ordering, readiness/liveness probes, metrics, centralized logs, alerting, and incident procedures.
 
 ### Strongly recommended
 
@@ -200,15 +195,15 @@ These changes do not complete the suite backend or establish a security certific
 - Expand compromised/common-password screening (current list is small) and benchmark password hashing parameters. Add MFA for administrators and step-up authentication for sensitive changes.
 - Review HSTS `includeSubDomains`/`preload` against actual domain ownership and TLS coverage; emit only when deployment guarantees HTTPS. Ensure reverse-proxy trust is restricted to controlled proxy hops.
 - Use object storage with private buckets, short-lived signed downloads, malware scanning, encryption, retention, size quotas, and DB-backed file metadata before enabling uploads. Local disk is not horizontally scalable.
-- Add API contract/authorization tests for every role and object scope; concurrency tests for refresh replay and approval decisions; migrations tested against clean and upgrade databases; browser E2E against a real local API.
+- Add API contract/authorization tests for every role and object scope; concurrency tests for refresh replay and approval decisions; startup schema sync tested against clean and upgrade databases; browser E2E against a real local API.
 - Add pagination limits, request size limits, timeouts, database pool/queue capacity tuning, graceful shutdown, and safe error redaction. Maintain dependency and container vulnerability scanning.
 - Document recovery, user provisioning, password reset, audit retention, privacy/legal retention, and data export/deletion procedures.
 
 ## Verification performed and limitations
 
-- Repository source, routes/OpenAPI, migrations, configuration, docs, and frontend structure were inspected. Existing working-tree changes were preserved; repos already contained substantial uncommitted work.
+- Repository source, routes/OpenAPI, schema sync, configuration, docs, and frontend structure were inspected. Existing working-tree changes were preserved; repos already contained substantial uncommitted work.
 - Frontend `npm run lint`, `npm test` (2 files / 16 tests), and `npm run build` pass in this environment.
-- Backend `cargo fmt --all -- --check` passes after formatting the checked-out Rust files. Rust compilation and a serial `cargo test --all-features -j 1` retry were blocked in the third-party `ring` native build by Windows linker file-lock/permission error (`LNK1114`). Backend tests and clippy are therefore **not confirmed**.
+- Backend formatting, all-target compilation, Clippy, and the 400-line source limit pass. Tests and live schema sync were not run here; Docker Desktop access was denied by the host session.
 - Playwright E2E did not complete: the default results directory was a read-only/reparse directory, and a retry with an isolated output directory stalled before producing test results. E2E verification remains open.
 - No live production environment, deployed database, SMTP provider, cloud storage, load test, external penetration test, or browser screenshot comparison was available for this assessment.
 

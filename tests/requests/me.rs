@@ -1,6 +1,5 @@
 use brightcone_hr_backend::{app::App, authz::Role, models::users};
 use loco_rs::testing::prelude::*;
-use sea_orm::IntoActiveModel;
 use serde_json::{json, Value};
 use serial_test::serial;
 
@@ -112,10 +111,7 @@ async fn a_disabled_account_loses_access_immediately() {
         let (token, _) = sign_in(&request, "a@brightcone.ai").await;
         assert_eq!(get_as(&request, "/api/me", &token).await.status_code(), 200);
 
-        user.into_active_model()
-            .set_status(&ctx.db, "disabled")
-            .await
-            .unwrap();
+        user.set_status(&database(&ctx), "disabled").await.unwrap();
         assert_eq!(get_as(&request, "/api/me", &token).await.status_code(), 401);
     })
     .await;
@@ -126,8 +122,7 @@ async fn a_disabled_account_loses_access_immediately() {
 async fn a_user_who_must_change_their_password_can_only_change_it() {
     request::<App, _, _>(|request, ctx| async move {
         let user = make_user(&ctx, "a@brightcone.ai", Role::HrAdmin).await;
-        user.into_active_model()
-            .set_password(&ctx.db, PASSWORD, true)
+        user.set_password(&database(&ctx), PASSWORD, true)
             .await
             .unwrap();
         let (token, _) = sign_in(&request, "a@brightcone.ai").await;
@@ -150,7 +145,7 @@ async fn a_user_who_must_change_their_password_can_only_change_it() {
                 .status_code(),
             200
         );
-        let user = users::Model::find_by_email(&ctx.db, "a@brightcone.ai")
+        let user = users::Model::find_by_email(&database(&ctx), "a@brightcone.ai")
             .await
             .unwrap();
         assert!(!user.must_change_password);

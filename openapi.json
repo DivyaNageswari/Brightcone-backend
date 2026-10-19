@@ -430,6 +430,59 @@
         }
       }
     },
+    "/api/backup": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "backup",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupDocument"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/backup/import": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Import summary"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -523,6 +576,403 @@
           },
           "401": {
             "description": "Not signed in"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "mark_read",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/record-types": {
+      "get": {
+        "tags": [
+          "record_types"
+        ],
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordCatalog"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/records/export.csv": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "csv",
+        "responses": {
+          "200": {
+            "description": "CSV export"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/records/{id}": {
+      "put": {
+        "tags": [
+          "records"
+        ],
+        "operationId": "update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordUpdateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/records/{id}/archive": {
+      "post": {
+        "tags": [
+          "records"
+        ],
+        "operationId": "archive",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/records/{id}/history": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "operationId": "history",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/records/{id}/restore": {
+      "post": {
+        "tags": [
+          "records"
+        ],
+        "operationId": "restore",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/records/{record_type}": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "records"
+        ],
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/rules": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Rule"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/rules/events/{id}/retry": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "operationId": "retry",
+        "responses": {
+          "202": {
+            "description": "Retry queued"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/rules/metrics": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "operationId": "metrics",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleMetrics"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/rules/{rule_key}": {
+      "put": {
+        "tags": [
+          "rules"
+        ],
+        "operationId": "update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -653,6 +1103,124 @@
           }
         }
       },
+      "BackupDocument": {
+        "type": "object",
+        "required": [
+          "format_version",
+          "records",
+          "history"
+        ],
+        "properties": {
+          "format_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupHistory"
+            }
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupRecord"
+            }
+          }
+        }
+      },
+      "BackupHistory": {
+        "type": "object",
+        "required": [
+          "record_id",
+          "action",
+          "source_actor_user_id",
+          "created_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "after_data": {},
+          "before_data": {},
+          "created_at": {
+            "type": "string"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_actor_user_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BackupImport": {
+        "type": "object",
+        "required": [
+          "format_version",
+          "records"
+        ],
+        "properties": {
+          "format_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupHistory"
+            }
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupRecord"
+            }
+          }
+        }
+      },
+      "BackupRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "record_type",
+          "source_id",
+          "data",
+          "created_by",
+          "updated_by"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "data": {},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "record_type": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ChangePasswordParams": {
         "type": "object",
         "required": [
@@ -688,6 +1256,47 @@
           }
         }
       },
+      "FieldSchema": {
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "required",
+          "unique",
+          "max_length",
+          "allowed_values"
+        ],
+        "properties": {
+          "allowed_values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "computed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "max_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "unique": {
+            "type": "boolean"
+          }
+        }
+      },
       "ForgotParams": {
         "type": "object",
         "required": [
@@ -714,6 +1323,38 @@
           "status": {
             "type": "string",
             "example": "ok"
+          }
+        }
+      },
+      "HistoryEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "record_id",
+          "action",
+          "actor_user_id",
+          "created_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor_user_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "after_data": {},
+          "before_data": {},
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -785,6 +1426,169 @@
           }
         }
       },
+      "Notification": {
+        "type": "object",
+        "required": [
+          "id",
+          "rule_key",
+          "title",
+          "body",
+          "created_at"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule_key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "NotificationPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "unread_count"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Record": {
+        "type": "object",
+        "required": [
+          "id",
+          "record_type",
+          "source_id",
+          "data",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "data": {},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "record_type": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordCatalog": {
+        "type": "object",
+        "required": [
+          "version",
+          "record_types"
+        ],
+        "properties": {
+          "record_types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordTypeSchema"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "RecordInput": {
+        "type": "object",
+        "required": [
+          "source_id",
+          "data"
+        ],
+        "properties": {
+          "data": {},
+          "source_id": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Record"
+            }
+          }
+        }
+      },
+      "RecordTypeSchema": {
+        "type": "object",
+        "required": [
+          "key",
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSchema"
+            }
+          },
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordUpdateInput": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {}
+        }
+      },
       "ResetParams": {
         "type": "object",
         "required": [
@@ -797,6 +1601,54 @@
           },
           "token": {
             "type": "string"
+          }
+        }
+      },
+      "Rule": {
+        "type": "object",
+        "required": [
+          "rule_key",
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "rule_key": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleMetrics": {
+        "type": "object",
+        "required": [
+          "pending",
+          "complete",
+          "failed"
+        ],
+        "properties": {
+          "complete": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "RuleUpdate": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
           }
         }
       },

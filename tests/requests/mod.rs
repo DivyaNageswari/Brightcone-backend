@@ -5,4 +5,6 @@ mod authz;
 mod health;
 mod me;
 mod rate_limit;
+mod records;
+mod rules;
 mod support;

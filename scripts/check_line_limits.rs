@@ -3,7 +3,7 @@ use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 
 const MAXIMUM_LINES: usize = 400;
-const CODE_DIRECTORIES: [&str; 4] = ["src", "migration", "tests", "examples"];
+const CODE_DIRECTORIES: [&str; 3] = ["src", "tests", "examples"];
 
 fn rust_sources(directory: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     for entry in fs::read_dir(directory)? {

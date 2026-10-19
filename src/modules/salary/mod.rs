@@ -104,7 +104,8 @@ impl SalaryStore {
                 increment_percent: 17.65,
                 effective_date: "2026-11-01".to_string(),
                 reason: "Annual Appraisal".to_string(),
-                notes: "Exceeded Q2 & Q3 organizational hiring and portal delivery benchmarks.".to_string(),
+                notes: "Exceeded Q2 & Q3 organizational hiring and portal delivery benchmarks."
+                    .to_string(),
                 status: "Under Review".to_string(),
                 approved_by: None,
                 approved_at: None,
@@ -180,18 +181,14 @@ impl SalaryStore {
     }
 }
 
-pub async fn calculate_salary(
-    Json(dto): Json<CalculateSalaryDto>,
-) -> Json<SalaryBreakdown> {
+pub async fn calculate_salary(Json(dto): Json<CalculateSalaryDto>) -> Json<SalaryBreakdown> {
     let pf_capped = dto.pf_capped.unwrap_or(true);
     let regime = dto.tax_regime.unwrap_or_else(|| "new".to_string());
     let breakdown = compute_salary_in_paise(dto.gross_monthly, pf_capped, &regime);
     Json(breakdown)
 }
 
-pub async fn list_structures(
-    State(store): State<SalaryStore>,
-) -> Json<Vec<SalaryStructure>> {
+pub async fn list_structures(State(store): State<SalaryStore>) -> Json<Vec<SalaryStructure>> {
     let list = store.structures.read().await;
     Json(list.clone())
 }
@@ -240,9 +237,7 @@ pub async fn create_structure(
     (StatusCode::CREATED, Json(new_structure))
 }
 
-pub async fn list_revisions(
-    State(store): State<SalaryStore>,
-) -> Json<Vec<SalaryRevision>> {
+pub async fn list_revisions(State(store): State<SalaryStore>) -> Json<Vec<SalaryRevision>> {
     let list = store.revisions.read().await;
     Json(list.clone())
 }

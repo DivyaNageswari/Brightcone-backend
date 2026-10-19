@@ -1,0 +1,29 @@
+name: Bug report
+description: Report incorrect or unsafe behavior
+title: "[Bug]: "
+labels: ["status:ready"]
+body:
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include environment and sanitized request/response details. Never include secrets or employee data.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and evidence
+      description: Include affected roles, logs with sensitive values removed, and test evidence.

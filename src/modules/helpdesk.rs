@@ -150,9 +150,7 @@ impl HelpdeskStore {
     }
 }
 
-pub async fn list_tickets(
-    State(store): State<HelpdeskStore>,
-) -> Json<Vec<Ticket>> {
+pub async fn list_tickets(State(store): State<HelpdeskStore>) -> Json<Vec<Ticket>> {
     let tickets = store.tickets.read().await;
     Json(tickets.clone())
 }
@@ -177,7 +175,10 @@ pub async fn create_ticket(
     Json(dto): Json<CreateTicketDto>,
 ) -> (StatusCode, Json<Ticket>) {
     let mut tickets = store.tickets.write().await;
-    let author_name = dto.employee_name.clone().unwrap_or_else(|| "Ananya Rao".to_string());
+    let author_name = dto
+        .employee_name
+        .clone()
+        .unwrap_or_else(|| "Ananya Rao".to_string());
     let initial_msg = dto.message.clone();
 
     let new_ticket = Ticket {
@@ -263,4 +264,3 @@ pub async fn update_status(
         )
     }
 }
-

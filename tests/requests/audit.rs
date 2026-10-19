@@ -2,12 +2,13 @@ use brightcone_hr_backend::{
     app::App,
     audit::{self, Entry},
     authz::Role,
-    models::_entities::audit_logs,
+    database::Database,
+    models::audit_logs,
     request_meta::RequestMeta,
 };
+use diesel::sql_query;
+use diesel_async::RunQueryDsl;
 use loco_rs::testing::prelude::*;
-use sea_orm::ConnectionTrait;
-use sea_orm::EntityTrait;
 use serde_json::Value;
 use serial_test::serial;
 
@@ -70,7 +71,7 @@ async fn the_log_pages_by_cursor_newest_first() {
         let (token, _) = sign_in(&request, "hr@brightcone.ai").await;
         for n in 0..5 {
             audit::record(
-                &ctx.db,
+                &database(&ctx),
                 None,
                 &RequestMeta::default(),
                 Entry::new("test.event").summary(format!("event {n}")),
@@ -109,7 +110,7 @@ async fn the_log_pages_by_cursor_newest_first() {
 async fn audit_rows_cannot_be_changed_or_deleted_even_by_the_table_owner() {
     request::<App, _, _>(|_request, ctx| async move {
         audit::record(
-            &ctx.db,
+            &database(&ctx),
             None,
             &RequestMeta::default(),
             Entry::new("test.event"),
@@ -117,17 +118,25 @@ async fn audit_rows_cannot_be_changed_or_deleted_even_by_the_table_owner() {
         .await
         .unwrap();
 
-        let update = ctx
-            .db
-            .execute_unprepared("UPDATE audit_logs SET action = 'tampered'")
+        let db = Database::from_context(&ctx).unwrap();
+        let mut conn = db.get().await.unwrap();
+        let update = sql_query("UPDATE audit_logs SET action = 'tampered'")
+            .execute(&mut *conn)
             .await;
         assert!(update.is_err(), "UPDATE must be blocked by the trigger");
-        let delete = ctx.db.execute_unprepared("DELETE FROM audit_logs").await;
+        let delete = sql_query("DELETE FROM audit_logs")
+            .execute(&mut *conn)
+            .await;
         assert!(delete.is_err(), "DELETE must be blocked by the trigger");
-        let truncate = ctx.db.execute_unprepared("TRUNCATE audit_logs").await;
+        let truncate =
+            diesel_async::SimpleAsyncConnection::batch_execute(&mut *conn, "TRUNCATE audit_logs")
+                .await;
         assert!(truncate.is_err(), "TRUNCATE must be blocked by the trigger");
 
-        let rows = audit_logs::Entity::find().all(&ctx.db).await.unwrap();
+        let rows = sql_query("SELECT * FROM audit_logs")
+            .load::<audit_logs::Model>(&mut *conn)
+            .await
+            .unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].action, "test.event");
     })

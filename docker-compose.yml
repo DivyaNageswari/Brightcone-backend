@@ -9,13 +9,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       # Used by docker/postgres-init/01-roles.sh on the very first start
-      MIGRATOR_PASSWORD: ${MIGRATOR_PASSWORD:-migrator_dev_pw}
+      SCHEMA_SYNC_PASSWORD: ${SCHEMA_SYNC_PASSWORD:-schema_sync_dev_pw}
       RUNTIME_PASSWORD: ${RUNTIME_PASSWORD:-runtime_dev_pw}
       QUEUE_PASSWORD: ${QUEUE_PASSWORD:-queue_dev_pw}
     ports:
       # Host port is 5433 because a native Windows PostgreSQL already owns 5432.
-      # Change it here and in .env (DATABASE_URL / QUEUE_URL / MIGRATION_DATABASE_URL
-      # / TEST_DATABASE_URL) together if you ever move this off 5433.
+      # Change this with the database URLs in .env if you move off 5433.
       - '5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -33,30 +32,6 @@ services:
       - '1025:1025'
       - '8025:8025'
 
-  # Applies the migrations, then exits. Kept as its own service because
-  # `db migrate` connects with DATABASE_URL -- there is no separate migration URL
-  # in Loco -- so it must be told to use the migrator role. Running it through the
-  # `api` service instead fails with "permission denied for schema public",
-  # because app_runtime is deliberately not allowed to create objects.
-  #   docker compose --profile app run --rm migrate
-  migrate:
-    profiles: ['app']
-    image: rust:1
-    working_dir: /app
-    command: cargo run -- db migrate
-    environment:
-      DATABASE_URL: postgres://app_migrator:${MIGRATOR_PASSWORD:-migrator_dev_pw}@postgres:5432/brightcone_dev
-      QUEUE_URL: postgres://app_queue:${QUEUE_PASSWORD:-queue_dev_pw}@postgres:5432/brightcone_dev
-      MAILER_HOST: mailpit
-      CARGO_TARGET_DIR: /cargo-target
-    volumes:
-      - .:/app
-      - cargo-registry:/usr/local/cargo/registry
-      - cargo-target:/cargo-target
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   # Prints the demo accounts and their passwords once. Refuses to run in production.
   #   docker compose --profile app run --rm seed
   seed:
@@ -66,6 +41,7 @@ services:
     command: cargo run -- task seed_demo
     environment:
       DATABASE_URL: postgres://app_runtime:${RUNTIME_PASSWORD:-runtime_dev_pw}@postgres:5432/brightcone_dev
+      SCHEMA_SYNC_DATABASE_URL: postgres://app_schema_sync:${SCHEMA_SYNC_PASSWORD:-schema_sync_dev_pw}@postgres:5432/brightcone_dev
       QUEUE_URL: postgres://app_queue:${QUEUE_PASSWORD:-queue_dev_pw}@postgres:5432/brightcone_dev
       MAILER_HOST: mailpit
       CARGO_TARGET_DIR: /cargo-target
@@ -84,6 +60,7 @@ services:
     command: cargo run -- start --server-and-worker
     environment:
       DATABASE_URL: postgres://app_runtime:${RUNTIME_PASSWORD:-runtime_dev_pw}@postgres:5432/brightcone_dev
+      SCHEMA_SYNC_DATABASE_URL: postgres://app_schema_sync:${SCHEMA_SYNC_PASSWORD:-schema_sync_dev_pw}@postgres:5432/brightcone_dev
       QUEUE_URL: postgres://app_queue:${QUEUE_PASSWORD:-queue_dev_pw}@postgres:5432/brightcone_dev
       MAILER_HOST: mailpit
       BINDING: 0.0.0.0

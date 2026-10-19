@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a product or platform change
+title: "[Feature]: "
+labels: ["status:ready"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user
+      description: Who needs this and what are they trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable behavior, including error and permission cases.
+      placeholder: "- Given … when … then …"
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and data
+      description: Note task IDs, APIs, schema changes, and data ownership.
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification evidence
+      description: State tests, API examples, or screenshots needed for completion.

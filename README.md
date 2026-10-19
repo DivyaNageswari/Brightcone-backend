@@ -46,10 +46,16 @@ Never commit `.env` or reuse demo credentials outside disposable local developme
 
 ```powershell
 docker compose up -d --wait postgres mailpit
-make migrate
-make seed       # local-only demo accounts; prints temporary passwords to terminal
 make run        # API on http://localhost:5150
+# In another terminal, optionally create local-only demo accounts:
+make seed       # prints temporary passwords to terminal
 ```
+
+The API applies additive schema sync at startup. `SCHEMA_SYNC_DATABASE_URL` must
+identify a PostgreSQL role permitted to create tables, add columns, and create
+indexes. The API uses the lower-privilege `DATABASE_URL` for normal queries.
+In production, provision these credentials separately; schema sync never drops
+tables or columns. Review `src/database/schema/manifest.rs` before deploying schema changes.
 
 The Vite frontend defaults to proxying `/api` to `http://localhost:5150`. Mailpit is available at `http://localhost:8025`.
 
@@ -67,13 +73,14 @@ For Docker-only backend commands, see `make help` and the Makefile. Run these ch
 ## Structure
 
 ```text
-src/app.rs                 route, middleware, migration and worker registration
+src/app.rs                 routes, middleware and worker registration
+src/database.rs            Diesel pool and startup schema-sync lifecycle hook
+src/database/schema/       additive PostgreSQL schema manifest and sync logic
 src/controllers/           HTTP request handlers
 src/dtos/                  request and response contracts
 src/models/                persistent database models
 src/{authz,audit,session}/ shared auth, authorization and audit services
 src/workers/               queued background workers
-migration/                 ordered PostgreSQL schema changes
 config/                    development, test and production configuration
 docker/                    local PostgreSQL roles and initialization
 tests/                     API and integration tests

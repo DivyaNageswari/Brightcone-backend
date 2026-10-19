@@ -2,6 +2,7 @@ use loco_rs::{hash, prelude::*};
 
 use crate::{
     authz::Role,
+    database::Database,
     models::users::{self, NewUser},
 };
 
@@ -31,8 +32,9 @@ impl Task for UserCreate {
         })?;
 
         let password = format!("{}-Aa1", hash::random_string(16));
+        let db = Database::from_context(ctx)?;
         let user = users::Model::create_with_password(
-            &ctx.db,
+            &db,
             &NewUser {
                 email: email.to_owned(),
                 name: name.to_owned(),

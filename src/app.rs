@@ -12,18 +12,16 @@ use loco_rs::{
     boot::{create_app, BootResult, StartMode},
     config::Config,
     controller::AppRoutes,
-    db::truncate_table,
     environment::Environment,
     task::Tasks,
     Result,
 };
-use std::path::Path;
 use tower_http::{
     compression::CompressionLayer, cors::CorsLayer, limit::RequestBodyLimitLayer,
     timeout::TimeoutLayer,
 };
 
-use crate::{controllers, data::Migrator, models::users, tasks};
+use crate::{controllers, database::Database, tasks};
 
 pub struct App;
 
@@ -130,7 +128,13 @@ impl Hooks for App {
         environment: &Environment,
         config: Config,
     ) -> Result<BootResult> {
-        create_app::<Self, Migrator>(mode, environment, config).await
+        create_app::<Self>(mode, environment, config).await
+    }
+
+    async fn after_context(ctx: AppContext) -> Result<AppContext> {
+        let database = Database::connect(ctx.environment == Environment::Test).await?;
+        ctx.shared_store.insert(database);
+        Ok(ctx)
     }
 
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
@@ -146,6 +150,11 @@ impl Hooks for App {
             .add_route(controllers::me::routes())
             .add_route(controllers::admin_users::routes())
             .add_route(controllers::audit_log::routes());
+        routes = routes.add_route(controllers::notifications::routes());
+        routes = routes.add_route(controllers::records::routes());
+        routes = routes.add_route(controllers::record_types::routes());
+        routes = routes.add_route(controllers::exports::routes());
+        routes = routes.add_route(controllers::rules::routes());
         // File and approvals controllers are prototypes backed by process-local registries.
         // Keep them out of the HTTP surface until durable, tenant-scoped persistence exists.
 
@@ -175,6 +184,12 @@ impl Hooks for App {
         queue
             .register(crate::workers::cleanup::TokenCleanupWorker::build(ctx))
             .await?;
+        queue
+            .register(crate::workers::rule_dispatch::RuleDispatchWorker::build(
+                ctx,
+            ))
+            .await?;
+        crate::rule_engine::enqueue_pending(ctx).await?;
         Ok(())
     }
 
@@ -185,15 +200,5 @@ impl Hooks for App {
         // the loco-rs template.
         tasks.register(tasks::user_create::UserCreate);
         tasks.register(tasks::seed_demo::SeedDemo);
-    }
-
-    async fn truncate(ctx: &AppContext) -> Result<()> {
-        truncate_table(&ctx.db, users::Entity).await?;
-        Ok(())
-    }
-
-    async fn seed(_ctx: &AppContext, _base: &Path) -> Result<()> {
-        // Demo data comes from the seed_demo task.
-        Ok(())
     }
 }

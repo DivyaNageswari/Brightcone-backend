@@ -110,32 +110,6 @@ mailer:
 #      - client_identifier: google # Identifier for the OAuth2 provider. Replace 'google' with your provider's name if different, must be unique within the oauth2 config.
 #        ... other fields
 
-# Database Configuration
-database:
-  # Database connection URI. Required — there is no safe default for a
-  # production database.
-  uri: <%= get_env(name="DATABASE_URL") %>
-  # When enabled, the sql query will be logged.
-  enable_logging: <%= get_env(name="DB_LOGGING", default="false") %>
-  # Set the timeout duration when acquiring a connection.
-  connect_timeout: <%= get_env(name="DB_CONNECT_TIMEOUT", default="5000") %>
-  # Set the idle duration before closing a connection.
-  idle_timeout: <%= get_env(name="DB_IDLE_TIMEOUT", default="500") %>
-  # Minimum number of connections for a pool.
-  min_connections: <%= get_env(name="DB_MIN_CONNECTIONS", default="1") %>
-  # Maximum number of connections for a pool. Serving real traffic on the
-  # development default of 1 serializes every request behind one connection.
-  max_connections: <%= get_env(name="DB_MAX_CONNECTIONS", default="10") %>
-  # Run migration up when application loaded.
-  # Convenient for single-instance deploys. Turn it off if you run more than
-  # one instance or migrate as a separate release step, so instances do not
-  # race to migrate the same database.
-  auto_migrate: <%= get_env(name="DB_AUTO_MIGRATE", default="false") %>
-  # Truncate database when application loaded. This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
-  dangerously_truncate: false
-  # Recreating schema when application loaded.  This is a dangerous operation, make sure that you using this flag only on dev environments or test mode
-  dangerously_recreate: false
-
 # Authentication Configuration
 auth:
   # JWT authentication

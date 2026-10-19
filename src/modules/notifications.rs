@@ -58,7 +58,8 @@ impl NotificationsStore {
                 id: "n-2".to_string(),
                 user_id: "current-user".to_string(),
                 title: "Expense Claim Approved".to_string(),
-                message: "Your claim of Rs 4,200 for Client Lunch was approved by Finance.".to_string(),
+                message: "Your claim of Rs 4,200 for Client Lunch was approved by Finance."
+                    .to_string(),
                 category: "expense".to_string(),
                 read: false,
                 created_at: "1 hour ago".to_string(),
@@ -94,7 +95,9 @@ pub async fn get_unread_count(
 ) -> Json<UnreadCountResponse> {
     let items = store.notifications.read().await;
     let count = items.iter().filter(|n| !n.read).count();
-    Json(UnreadCountResponse { unread_count: count })
+    Json(UnreadCountResponse {
+        unread_count: count,
+    })
 }
 
 pub async fn mark_read(
@@ -110,9 +113,7 @@ pub async fn mark_read(
     }
 }
 
-pub async fn mark_all_read(
-    State(store): State<NotificationsStore>,
-) -> impl IntoResponse {
+pub async fn mark_all_read(State(store): State<NotificationsStore>) -> impl IntoResponse {
     let mut items = store.notifications.write().await;
     for item in items.iter_mut() {
         item.read = true;
@@ -138,4 +139,3 @@ pub async fn create_notification(
     items.insert(0, new_item.clone());
     (StatusCode::CREATED, Json(new_item))
 }
-

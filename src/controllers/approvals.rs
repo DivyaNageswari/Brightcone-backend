@@ -65,10 +65,10 @@ pub async fn list(auth: AuthUser, State(_ctx): State<AppContext>) -> Result<Resp
 
     let records: Vec<ApprovalRecord> = match auth.role {
         // Finance and HR Admin view all requests
-        Role::Finance | Role::HrAdmin => lock.iter().cloned().collect(),
+        Role::Finance | Role::HrAdmin | Role::PayrollAdmin => lock.iter().cloned().collect(),
         // Managers view their scope
         Role::Manager => lock.iter().cloned().collect(),
-        Role::Employee => Vec::new(),
+        Role::Employee | Role::Recruiter => Vec::new(),
     };
 
     format::json(records)

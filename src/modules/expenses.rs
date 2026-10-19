@@ -115,9 +115,7 @@ impl ExpensesStore {
 }
 
 // Handlers
-pub async fn list_claims(
-    State(store): State<ExpensesStore>,
-) -> Json<Vec<ExpenseClaim>> {
+pub async fn list_claims(State(store): State<ExpensesStore>) -> Json<Vec<ExpenseClaim>> {
     let claims = store.claims.read().await;
     Json(claims.clone())
 }
@@ -130,7 +128,9 @@ pub async fn create_claim(
     let new_claim = ExpenseClaim {
         id: format!("E-{}", &Uuid::new_v4().to_string()[..6].to_uppercase()),
         employee_id: dto.employee_id.unwrap_or_else(|| "EMP-001".to_string()),
-        employee_name: dto.employee_name.unwrap_or_else(|| "Ananya Rao".to_string()),
+        employee_name: dto
+            .employee_name
+            .unwrap_or_else(|| "Ananya Rao".to_string()),
         category: dto.category,
         amount: dto.amount,
         date: dto.date,
@@ -220,4 +220,3 @@ pub async fn pay_claim(
         )
     }
 }
-

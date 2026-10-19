@@ -6,6 +6,7 @@ use axum::{
 };
 use loco_rs::prelude::*;
 use serde::Serialize;
+use uuid::Uuid;
 
 use crate::settings::AppSettings;
 

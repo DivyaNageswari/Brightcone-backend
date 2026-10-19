@@ -1,0 +1,30 @@
+- name: area:backend
+  color: "1d76db"
+  description: Backend implementation or service behavior
+- name: area:frontend
+  color: "5319e7"
+  description: Frontend implementation or user experience
+- name: area:documentation
+  color: "0075ca"
+  description: Documentation, API contract, or generated types
+- name: area:security
+  color: "b60205"
+  description: Authentication, authorization, privacy, or security controls
+- name: status:blocked
+  color: "d93f0b"
+  description: Work cannot proceed until a named dependency is resolved
+- name: status:ready
+  color: "0e8a16"
+  description: Acceptance criteria and dependencies are ready for implementation
+- name: priority:urgent
+  color: "b60205"
+  description: Urgent priority
+- name: priority:high
+  color: "d93f0b"
+  description: High priority
+- name: sprint:1
+  color: "c5def5"
+  description: Sprint 1 scope
+- name: sprint:2
+  color: "bfdadc"
+  description: Sprint 2 scope
