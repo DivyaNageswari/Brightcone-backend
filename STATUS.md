@@ -22,9 +22,10 @@ Last reviewed: 19 October 2026. This file reports the code currently in this bra
 
 ## Not implemented as production features
 
-- Employee/org/team records, leave, payroll, expenses, recruitment, benefits, schedules, learning, feed, and reporting APIs.
+- Durable employee/org/team records, leave, payroll, expenses, recruitment, benefits, schedules, learning, feed, and reporting workflows.
 - Durable upload metadata/object storage and durable approvals. Existing handlers are prototypes and are not registered as routes.
 - Tenant isolation; current roles are global. Multi-replica rate limiting and operational deployment controls.
+- Phase 1-3 handlers under `src/modules/` use process-local sample stores and lack the required authentication/authorization integration. Their router is deliberately not registered; do not expose these endpoints until persistent storage and access controls are implemented.
 
 ## Branch work
 
@@ -37,13 +38,12 @@ Last reviewed: 19 October 2026. This file reports the code currently in this bra
 - Tightened the API Content Security Policy.
 - Removed prototype Files/Approvals handlers from the active HTTP routes until persistence and scope checks exist.
 - Applied self-decision prevention to approval rejection as well as approval.
+- Kept the in-memory domain handler prototypes out of the active HTTP routes pending durable persistence and authenticated authorization.
 
 ## Verification
 
 - `cargo fmt --all -- --check`: passed.
-- `cargo check --all-targets --all-features -j 1`: passed.
-- `cargo clippy --all-targets --all-features -- -D warnings`: passed.
-- The 400-line limit check passed for all 57 Rust files.
+- Clippy and the 400-line source check passed before the destination branch added domain handler prototypes; they were not reconfirmed against that newer snapshot.
 - Database-backed request tests and live PostgreSQL startup sync were not run; no PostgreSQL service was available in the host environment.
 - `cargo check --all-targets --all-features -j 1` could not be reconfirmed in this environment: the configured target directory was inaccessible, and an in-repo retry failed while MSVC attempted to overwrite the `ring` archive (LNK1114 / Windows error 5).
 

@@ -155,6 +155,7 @@ impl Hooks for App {
         routes = routes.add_route(controllers::record_types::routes());
         routes = routes.add_route(controllers::exports::routes());
         routes = routes.add_route(controllers::rules::routes());
+        // Process-local domain module prototypes are intentionally not routed.
         // File and approvals controllers are prototypes backed by process-local registries.
         // Keep them out of the HTTP surface until durable, tenant-scoped persistence exists.
 
@@ -168,7 +169,6 @@ impl Hooks for App {
 
     async fn after_routes(router: Router, ctx: &AppContext) -> Result<Router> {
         let origin = crate::settings::AppSettings::from_ctx(ctx).frontend_url;
-        let router = router.merge(crate::modules::domain_router());
         Ok(router
             .layer(cors_layer(&origin)?)
             .layer(CompressionLayer::new().gzip(true).br(true))

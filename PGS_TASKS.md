@@ -19,4 +19,5 @@ This checklist describes the implementation in this branch. “Implemented” me
 - Backend formatting check passed on 19 October 2026.
 - Current backend compilation could not be verified: the configured Cargo target path was inaccessible; an in-repository retry failed in the native `ring` build with MSVC LNK1114 / Windows error 5.
 - PostgreSQL-backed tests and startup sync were not run because no database service was reachable in the review environment.
+- The separate Phase 1-3 module handlers use in-memory sample stores and are not registered in the HTTP router; persistent storage and authenticated authorization are prerequisites to enabling them.
 - See `PROJECT_ASSESSMENT.md` and `STATUS.md` for architecture and release limitations.
