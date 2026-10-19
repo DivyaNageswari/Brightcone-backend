@@ -52,7 +52,7 @@ jobs:
         run: |
           export PGPASSWORD=postgres
           SCHEMA_SYNC_PASSWORD=schema_sync_dev_pw RUNTIME_PASSWORD=runtime_dev_pw QUEUE_PASSWORD=queue_dev_pw \
-          POSTGRES_USER=postgres PGHOST=localhost bash docker/postgres-init/01-roles.sh
+          POSTGRES_USER=postgres PGHOST=localhost bash scripts/setup_roles.sh
 
       - name: Format
         run: cargo fmt --all -- --check

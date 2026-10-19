@@ -28,7 +28,7 @@ The OpenAPI document is the contract for request/response fields. There are no a
 
 ## Local development
 
-Requirements: Rust toolchain from `rust-toolchain.toml`, Docker Desktop, Node.js/npm for the frontend, and Windows MSVC C++ build tools on Windows.
+Requirements: Rust toolchain from `rust-toolchain.toml`, native PostgreSQL 16+ on Windows (port 5432), Node.js/npm for the frontend, and Windows MSVC C++ build tools.
 
 From this directory in PowerShell:
 
@@ -42,10 +42,9 @@ Generate a unique local signing secret and put it in ignored `.env`:
 openssl rand -base64 48
 ```
 
-Never commit `.env` or reuse demo credentials outside disposable local development.
-
+Initialize your native PostgreSQL database:
 ```powershell
-docker compose up -d --wait postgres mailpit
+psql -U postgres -p 5432 -f scripts/setup_postgres_native.sql
 make run        # API on http://localhost:5150
 # In another terminal, optionally create local-only demo accounts:
 make seed       # prints temporary passwords to terminal
@@ -57,7 +56,7 @@ indexes. The API uses the lower-privilege `DATABASE_URL` for normal queries.
 In production, provision these credentials separately; schema sync never drops
 tables or columns. Review `src/database/schema/manifest.rs` before deploying schema changes.
 
-The Vite frontend defaults to proxying `/api` to `http://localhost:5150`. Mailpit is available at `http://localhost:8025`.
+The Vite frontend defaults to proxying `/api` to `http://localhost:5150`.
 
 ## Checks
 
@@ -67,8 +66,6 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
 make line-limit
 ```
-
-For Docker-only backend commands, see `make help` and the Makefile. Run these checks on a clean environment before merging; native Windows dependencies can require MSVC and a writable Cargo target directory.
 
 ## Structure
 
@@ -82,9 +79,8 @@ src/models/                persistent database models
 src/{authz,audit,session}/ shared auth, authorization and audit services
 src/workers/               queued background workers
 config/                    development, test and production configuration
-docker/                    local PostgreSQL roles and initialization
+scripts/                   database setup and source-size enforcement
 tests/                     API and integration tests
-scripts/                   source-size enforcement
 ```
 
 ## Security and scope

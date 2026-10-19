@@ -2,18 +2,7 @@
 -include .env
 export
 
-.PHONY: db-up db-down db-reset run seed test lint fmt openapi line-limit \
-        docker-seed docker-run docker-down docker-reset
-
-db-up: ## start Postgres and the mail catcher
-	docker compose up -d --wait postgres mailpit
-
-db-down: ## stop services (data is kept)
-	docker compose down
-
-db-reset: ## DELETE the local database volume; startup sync recreates schema
-	docker compose down -v
-	docker compose up -d --wait postgres mailpit
+.PHONY: run seed test lint fmt openapi line-limit
 
 run: ## start the API on http://localhost:5150 with worker
 	cargo loco start --server-and-worker
@@ -39,17 +28,3 @@ line-limit: ## enforce the 400-line Rust source file limit
 	mkdir -p target
 	rustc --edition=2021 scripts/check_line_limits.rs -o target/check_line_limits.exe
 	target/check_line_limits.exe
-
-# --- the same steps with no Rust on the host (Docker only) ---------------------
-docker-seed: ## create the demo accounts in Docker
-	docker compose --profile app run --rm seed
-
-docker-run: ## start the API in Docker on http://localhost:5150
-	docker compose --profile app up api
-
-docker-down: ## stop every container (data is kept)
-	docker compose --profile app down
-
-docker-reset: ## DELETE the database volume; API startup recreates schema
-	docker compose --profile app down -v
-	docker compose up -d --wait postgres mailpit

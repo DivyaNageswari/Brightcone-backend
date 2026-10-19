@@ -116,18 +116,17 @@ Keep controllers thin (parse/authenticate/validate/serialize), put business rule
 
 ## Running locally
 
-Commands below assume PowerShell from the workspace root and Docker Desktop. Never use production data or production credentials in the demo seed workflow.
+Commands below assume PowerShell from the workspace root with native PostgreSQL 18 running locally on port 5432. Never use production data or production credentials in the demo seed workflow.
 
-1. Start local PostgreSQL and Mailpit:
+1. Initialize local PostgreSQL databases and roles:
 
    ```powershell
-   cd repos/brightcone-hr-backend
-   docker compose up -d --wait postgres mailpit
+   psql -U postgres -p 5432 -f scripts/setup_postgres_native.sql
    ```
 
-2. Create the backend `.env` from `.env.example` and generate a unique random `JWT_SECRET` (for example, `openssl rand -base64 48`). Keep `.env` untracked. Set separate `DATABASE_URL` (runtime role), `SCHEMA_SYNC_DATABASE_URL` (DDL role), and `QUEUE_URL` values for the local Compose database. Do not reuse development credentials outside an isolated local database. For the frontend, `.env.example` documents `VITE_PROXY_TARGET=http://localhost:5150` and `VITE_API_URL=/api`; copy it to the Vite env file used by the project if overrides are needed.
+2. Create the backend `.env` from `.env.example` and generate a unique random `JWT_SECRET` (for example, `openssl rand -base64 48`). Keep `.env` untracked. Set separate `DATABASE_URL` (runtime role), `SCHEMA_SYNC_DATABASE_URL` (DDL role), and `QUEUE_URL` values for the local PostgreSQL database. Do not reuse development credentials outside an isolated local database. For the frontend, `.env.example` documents `VITE_PROXY_TARGET=http://localhost:5150` and `VITE_API_URL=/api`; copy it to the Vite env file used by the project if overrides are needed.
 
-3. Start the API. It syncs schema before serving requests; seed demo users only in disposable local development:
+3. Start the API. It syncs schema automatically before serving requests; seed demo users only in disposable local development:
 
    ```powershell
    cargo run -- start --server-and-worker
@@ -135,7 +134,7 @@ Commands below assume PowerShell from the workspace root and Docker Desktop. Nev
    cargo run -- task seed_demo
    ```
 
-4. The API listens on `http://localhost:5150` by default. For Docker, run `docker compose --profile app up api` instead of the host command above.
+4. The API listens on `http://localhost:5150` by default.
 
 5. In another terminal, install and run the frontend:
 
