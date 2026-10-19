@@ -78,5 +78,5 @@ fn database_name(url: &str) -> Option<&str> {
 
 fn database_error(error: impl std::fmt::Display) -> Error {
     tracing::error!(error = %error, "Diesel database operation failed");
-    Error::string("Database operation failed")
+    Error::string(&format!("Database operation failed: {error}"))
 }

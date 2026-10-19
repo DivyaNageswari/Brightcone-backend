@@ -276,9 +276,8 @@ pub async fn history(
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/records")
-        .add("/:record_type", get(list).post(create))
-        .add("/:id", put(update))
-        .add("/:id/archive", post(archive))
-        .add("/:id/restore", post(restore))
-        .add("/:id/history", get(history))
+        .add("/{record_type}", get(list).post(create).put(update))
+        .add("/{record_type}/archive", post(archive))
+        .add("/{record_type}/restore", post(restore))
+        .add("/{record_type}/history", get(history))
 }

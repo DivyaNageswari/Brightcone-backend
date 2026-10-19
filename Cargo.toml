@@ -1,4 +1,4 @@
-﻿[workspace]
+[workspace]
 
 [package]
 name = "brightcone-hr-backend"
@@ -16,6 +16,7 @@ loco-rs = { version = "1.2", default-features = false, features = ["auth", "cach
 loco-rs = { workspace = true }
 diesel = { version = "2.3", features = ["chrono", "postgres", "uuid", "serde_json"] }
 diesel-async = { version = "0.9", features = ["deadpool", "postgres"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 tokio = { version = "1.45", default-features = false, features = [
