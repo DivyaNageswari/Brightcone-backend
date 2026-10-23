@@ -1,25 +1,16 @@
-//! Reading the audit log (ticket P1-09). HR only. Pages are keyed by id, not by offset, so the
-//! log stays fast however long it grows.
-use diesel::{
-    sql_query,
-    sql_types::{BigInt, Nullable, Text},
-};
-use diesel_async::RunQueryDsl;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{authz::AuthUser, database::Database, models::audit_logs};
+use crate::{authz::AuthUser, models::_entities::audit_logs};
 
 const DEFAULT_LIMIT: u64 = 50;
 const MAX_LIMIT: u64 = 200;
 
 #[derive(Debug, Deserialize)]
 pub struct AuditQuery {
-    /// Return entries older than this id (the `next_before_id` of the previous page).
     before_id: Option<i64>,
     limit: Option<u64>,
-    /// For example `auth.` for everything about signing in.
     action_prefix: Option<String>,
     actor_user_id: Option<i64>,
 }
@@ -39,11 +30,9 @@ pub struct AuditEntryResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AuditPage {
     pub items: Vec<AuditEntryResponse>,
-    /// Pass this as `before_id` to get the next page. Absent on the last page.
     pub next_before_id: Option<i64>,
 }
 
-/// Who did what and when, newest first.
 #[utoipa::path(
     get,
     path = "/api/audit",
@@ -64,25 +53,23 @@ pub async fn list(
 ) -> Result<Response> {
     auth.require("audit:read")?;
     let limit = q.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let db = Database::from_context(&ctx)?;
-    let prefix = q
+
+    let mut select = audit_logs::Entity::find().order_by_desc(audit_logs::Column::Id);
+    if let Some(before) = q.before_id {
+        select = select.filter(audit_logs::Column::Id.lt(before));
+    }
+    if let Some(prefix) = q
         .action_prefix
-        .filter(|value| !value.is_empty() && value.len() <= 64);
-    let mut conn = db.get().await?;
-    let mut rows = sql_query(
-        "SELECT * FROM audit_logs \
-         WHERE ($1::bigint IS NULL OR id < $1) \
-           AND ($2::text IS NULL OR action LIKE $2 || '%') \
-           AND ($3::bigint IS NULL OR actor_user_id = $3) \
-         ORDER BY id DESC LIMIT $4",
-    )
-    .bind::<Nullable<BigInt>, _>(q.before_id)
-    .bind::<Nullable<Text>, _>(prefix)
-    .bind::<Nullable<BigInt>, _>(q.actor_user_id)
-    .bind::<BigInt, _>(i64::try_from(limit.saturating_add(1)).unwrap_or(i64::MAX))
-    .load::<audit_logs::Model>(&mut *conn)
-    .await
-    .map_err(Database::map_error)?;
+        .as_deref()
+        .filter(|p| !p.is_empty() && p.len() <= 64)
+    {
+        select = select.filter(audit_logs::Column::Action.starts_with(prefix));
+    }
+    if let Some(actor) = q.actor_user_id {
+        select = select.filter(audit_logs::Column::ActorUserId.eq(actor));
+    }
+
+    let mut rows = select.limit(limit + 1).all(&ctx.db).await?;
     let has_more = rows.len() as u64 > limit;
     rows.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
     let next_before_id = if has_more {

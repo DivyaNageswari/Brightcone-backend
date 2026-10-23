@@ -3,23 +3,17 @@ use brightcone_hr_backend::{
     authz::Role,
     models::{
         password_resets,
-        refresh_tokens::hash_token,
+        refresh_tokens::{self, hash_token},
         users::{self},
     },
 };
-use diesel::{prelude::QueryableByName, sql_query, sql_types::Text};
-use diesel_async::RunQueryDsl;
+use sea_orm::EntityTrait;
 use loco_rs::testing::prelude::*;
 use serde_json::{json, Value};
 use serial_test::serial;
 
 use super::support::*;
 
-#[derive(QueryableByName)]
-struct TokenHashRow {
-    #[diesel(sql_type = Text)]
-    token_hash: String,
-}
 
 #[tokio::test]
 #[serial]
@@ -51,12 +45,7 @@ async fn login_returns_access_token_and_a_hardened_refresh_cookie() {
 
         // Only the hash is stored.
         let secret = refresh_secret(&response);
-        let db = database(&ctx);
-        let mut conn = db.get().await.unwrap();
-        let stored = sql_query("SELECT token_hash FROM refresh_tokens")
-            .load::<TokenHashRow>(&mut *conn)
-            .await
-            .unwrap();
+        let stored = refresh_tokens::Entity::find().all(&ctx.db).await.unwrap();
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].token_hash, hash_token(&secret));
         assert_ne!(stored[0].token_hash, secret);

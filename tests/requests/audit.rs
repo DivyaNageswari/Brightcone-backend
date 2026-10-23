@@ -2,12 +2,10 @@ use brightcone_hr_backend::{
     app::App,
     audit::{self, Entry},
     authz::Role,
-    database::Database,
     models::audit_logs,
     request_meta::RequestMeta,
 };
-use diesel::sql_query;
-use diesel_async::RunQueryDsl;
+use sea_orm::{ConnectionTrait, EntityTrait};
 use loco_rs::testing::prelude::*;
 use serde_json::Value;
 use serial_test::serial;
@@ -118,25 +116,14 @@ async fn audit_rows_cannot_be_changed_or_deleted_even_by_the_table_owner() {
         .await
         .unwrap();
 
-        let db = Database::from_context(&ctx).unwrap();
-        let mut conn = db.get().await.unwrap();
-        let update = sql_query("UPDATE audit_logs SET action = 'tampered'")
-            .execute(&mut *conn)
-            .await;
+        let update = ctx.db.execute_unprepared("UPDATE audit_logs SET action = 'tampered'").await;
         assert!(update.is_err(), "UPDATE must be blocked by the trigger");
-        let delete = sql_query("DELETE FROM audit_logs")
-            .execute(&mut *conn)
-            .await;
+        let delete = ctx.db.execute_unprepared("DELETE FROM audit_logs").await;
         assert!(delete.is_err(), "DELETE must be blocked by the trigger");
-        let truncate =
-            diesel_async::SimpleAsyncConnection::batch_execute(&mut *conn, "TRUNCATE audit_logs")
-                .await;
+        let truncate = ctx.db.execute_unprepared("TRUNCATE audit_logs;").await;
         assert!(truncate.is_err(), "TRUNCATE must be blocked by the trigger");
 
-        let rows = sql_query("SELECT * FROM audit_logs")
-            .load::<audit_logs::Model>(&mut *conn)
-            .await
-            .unwrap();
+        let rows = audit_logs::Entity::find().all(&ctx.db).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].action, "test.event");
     })

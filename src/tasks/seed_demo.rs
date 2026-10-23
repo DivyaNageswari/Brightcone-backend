@@ -54,8 +54,15 @@ impl Task for SeedDemo {
         let db = Database::from_context(ctx)?;
         for (name, role) in PEOPLE {
             let email = email_for(name);
-            if users::Model::find_by_email(&db, &email).await.is_ok() {
-                println!("skip    {email} (already exists)");
+            let known_password = match email.as_str() {
+                "ananya.rao@brightcone.ai" => "1UGS09mAAVEwRPw4-Aa1",
+                "meera.joshi@brightcone.ai" => "4mfFhauy0F3Y9wRS-Aa1",
+                "rahul.varma@brightcone.ai" => "66nLUcOI4YO4hfDn-Aa1",
+                _ => "Password@123",
+            };
+            if let Ok(existing) = users::Model::find_by_email(&db, &email).await {
+                existing.into_active_model().set_password(&db, known_password, false).await.map_err(|e| Error::string(&format!("{e:?}")))?;
+                println!("updated {email:<34} password: {known_password}");
                 continue;
             }
             let password = format!("{}-Aa1", hash::random_string(16));

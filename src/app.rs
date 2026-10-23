@@ -23,6 +23,14 @@ use tower_http::{
 
 use crate::{controllers, database::Database, tasks};
 
+pub struct Migrator;
+#[async_trait]
+impl sea_orm_migration::MigratorTrait for Migrator {
+    fn migrations() -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
+        vec![]
+    }
+}
+
 pub struct App;
 
 // ---------------------------------------------------------------------------
@@ -128,17 +136,26 @@ impl Hooks for App {
         environment: &Environment,
         config: Config,
     ) -> Result<BootResult> {
-        create_app::<Self>(mode, environment, config).await
+        create_app::<Self, Migrator>(mode, environment, config).await
     }
 
     async fn after_context(ctx: AppContext) -> Result<AppContext> {
-        let database = Database::connect(ctx.environment == Environment::Test).await?;
+        let database = Database::new(ctx.db.clone());
         ctx.shared_store.insert(database);
         Ok(ctx)
     }
 
+        async fn truncate(_ctx: &AppContext) -> Result<()> {
+        Ok(())
+    }
+
+    async fn seed(_ctx: &AppContext, _path: &std::path::Path) -> Result<()> {
+        Ok(())
+    }
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
-        Ok(vec![])
+        Ok(vec![Box::new(
+            crate::initializers::SchemaSyncInitializer,
+        )])
     }
 
     fn routes(ctx: &AppContext) -> AppRoutes {
@@ -169,6 +186,7 @@ impl Hooks for App {
 
     async fn after_routes(router: Router, ctx: &AppContext) -> Result<Router> {
         let origin = crate::settings::AppSettings::from_ctx(ctx).frontend_url;
+        let router = router.merge(crate::modules::domain_router());
         Ok(router
             .layer(cors_layer(&origin)?)
             .layer(CompressionLayer::new().gzip(true).br(true))

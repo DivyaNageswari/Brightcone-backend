@@ -3,6 +3,7 @@ pub mod expenses;
 pub mod helpdesk;
 pub mod notifications;
 pub mod office_expenses;
+pub mod payroll;
 pub mod salary;
 
 use announcements::{
@@ -17,10 +18,10 @@ use expenses::{approve_claim, create_claim, list_claims, pay_claim, reject_claim
 use helpdesk::{
     add_reply, assign_ticket, create_ticket, get_ticket, list_tickets, update_status, HelpdeskStore,
 };
-use notifications::{
-    create_notification, get_unread_count, list_notifications, mark_all_read, mark_read,
-    NotificationsStore,
-};
+// use notifications::{
+//     create_notification, get_unread_count, list_notifications, mark_all_read, mark_read,
+//     NotificationsStore,
+// };
 use office_expenses::{
     create_office_expense, get_analytics, list_office_expenses, OfficeExpensesStore,
 };
@@ -30,22 +31,11 @@ use salary::{
 };
 
 pub fn domain_router() -> Router {
-    let notifications_store = NotificationsStore::new();
     let expenses_store = ExpensesStore::new();
     let helpdesk_store = HelpdeskStore::new();
     let announcements_store = AnnouncementsStore::new();
     let office_expenses_store = OfficeExpensesStore::new();
     let salary_store = SalaryStore::new();
-
-    let notifications_router = Router::new()
-        .route(
-            "/api/notifications",
-            get(list_notifications).post(create_notification),
-        )
-        .route("/api/notifications/unread-count", get(get_unread_count))
-        .route("/api/notifications/{id}/read", post(mark_read))
-        .route("/api/notifications/mark-all-read", post(mark_all_read))
-        .with_state(notifications_store);
 
     let expenses_router = Router::new()
         .route("/api/expenses", get(list_claims).post(create_claim))
@@ -100,10 +90,11 @@ pub fn domain_router() -> Router {
         .with_state(salary_store);
 
     Router::new()
-        .merge(notifications_router)
+        // .merge(notifications_router)
         .merge(expenses_router)
         .merge(helpdesk_router)
         .merge(announcements_router)
         .merge(office_expenses_router)
         .merge(salary_router)
+        .merge(payroll::router())
 }

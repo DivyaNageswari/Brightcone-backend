@@ -1,33 +1,24 @@
-use std::collections::HashSet;
 
-use diesel::{
-    prelude::QueryableByName,
-    sql_query,
-    sql_types::{BigInt, Jsonb, Nullable, Text, Uuid as SqlUuid},
-};
-use diesel_async::{AsyncConnection, RunQueryDsl};
 use loco_rs::prelude::*;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    authz::AuthUser, controllers::records::Record, database::Database, models::error::ModelError,
+    authz::AuthUser,
+    models::_entities::{
+        hr_record_history::{self, Entity as HrRecordHistory},
+        hr_record_unique_claims,
+        hr_records::{self, Entity as HrRecords},
+    },
     records,
 };
 
-const EXPORT_LIMIT: i64 = 10_000;
-const MAX_EXPORT_DATA_BYTES: i64 = 1_000_000;
-
-#[derive(QueryableByName)]
-struct ExportStats {
-    #[diesel(sql_type = BigInt)]
-    records: i64,
-    #[diesel(sql_type = BigInt)]
-    history: i64,
-    #[diesel(sql_type = BigInt)]
-    data_bytes: i64,
-}
+const EXPORT_LIMIT: u64 = 10_000;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BackupDocument {
@@ -36,21 +27,14 @@ pub struct BackupDocument {
     pub history: Vec<BackupHistory>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackupRecord {
-    #[diesel(sql_type = SqlUuid)]
     pub id: Uuid,
-    #[diesel(sql_type = Text)]
     pub record_type: String,
-    #[diesel(sql_type = Text)]
     pub source_id: String,
-    #[diesel(sql_type = Jsonb)]
     pub data: serde_json::Value,
-    #[diesel(sql_type = Nullable<Text>)]
     pub archived_at: Option<String>,
-    #[diesel(sql_type = BigInt)]
     pub created_by: i64,
-    #[diesel(sql_type = BigInt)]
     pub updated_by: i64,
 }
 
@@ -62,19 +46,13 @@ pub struct BackupImport {
     pub history: Vec<BackupHistory>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackupHistory {
-    #[diesel(sql_type = SqlUuid)]
     pub record_id: Uuid,
-    #[diesel(sql_type = Text)]
     pub action: String,
-    #[diesel(sql_type = BigInt)]
     pub source_actor_user_id: i64,
-    #[diesel(sql_type = Nullable<Jsonb>)]
     pub before_data: Option<serde_json::Value>,
-    #[diesel(sql_type = Nullable<Jsonb>)]
     pub after_data: Option<serde_json::Value>,
-    #[diesel(sql_type = Text)]
     pub created_at: String,
 }
 
@@ -120,7 +98,20 @@ fn json_download(value: &impl Serialize) -> Result<Response> {
     Ok(response)
 }
 
-#[utoipa::path(get, path = "/api/records/export.csv", security(("bearer" = [])), responses((status = 200, description = "CSV export")))]
+fn csv_cell(val: &str) -> String {
+    if val.contains(',') || val.contains('\"') || val.contains('\n') || val.contains('\r') {
+        format!("\"{}\"", val.replace('\"', "\"\""))
+    } else {
+        val.to_string()
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/records/export.csv",
+    security(("bearer" = [])),
+    responses((status = 200, description = "CSV export"))
+)]
 #[debug_handler]
 pub async fn csv(
     auth: AuthUser,
@@ -128,41 +119,40 @@ pub async fn csv(
     Query(query): Query<super::records::ListQuery>,
 ) -> Result<Response> {
     require_export_access(&auth)?;
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let stats = sql_query("SELECT count(*)::bigint AS records, 0::bigint AS history, COALESCE(sum(pg_column_size(data)),0)::bigint AS data_bytes FROM hr_records WHERE ($1 OR archived_at IS NULL)")
-        .bind::<diesel::sql_types::Bool,_>(query.include_archived.unwrap_or(false))
-        .get_result::<ExportStats>(&mut *conn).await.map_err(Database::map_error)?;
-    if stats.records > EXPORT_LIMIT || stats.data_bytes > MAX_EXPORT_DATA_BYTES {
-        return Err(payload_too_large());
+    let mut select = HrRecords::find().order_by_desc(hr_records::Column::CreatedAt);
+
+    if !query.include_archived.unwrap_or(false) {
+        select = select.filter(hr_records::Column::ArchivedAt.is_null());
     }
-    let rows = sql_query("SELECT id, record_type, source_id, data, archived_at::text AS archived_at, created_at::text AS created_at, updated_at::text AS updated_at FROM hr_records WHERE ($1 OR archived_at IS NULL) ORDER BY record_type, created_at DESC LIMIT $2")
-        .bind::<diesel::sql_types::Bool,_>(query.include_archived.unwrap_or(false))
-        .bind::<BigInt,_>(EXPORT_LIMIT).load::<Record>(&mut *conn).await.map_err(Database::map_error)?;
+
+    let rows = select.limit(EXPORT_LIMIT).all(&ctx.db).await?;
+
     let mut body =
         String::from("id,record_type,source_id,data,archived_at,created_at,updated_at\r\n");
-    for row in rows {
+
+    for r in rows {
         let values = [
-            row.id.to_string(),
-            row.record_type,
-            row.source_id,
-            row.data.to_string(),
-            row.archived_at.unwrap_or_default(),
-            row.created_at,
-            row.updated_at,
+            r.id.to_string(),
+            r.record_type,
+            r.source_id,
+            r.data.to_string(),
+            r.archived_at.map(|t| t.to_rfc3339()).unwrap_or_default(),
+            r.created_at.to_rfc3339(),
+            r.updated_at.to_rfc3339(),
         ];
-        body.push_str(
-            &values
-                .iter()
-                .map(|value| csv_cell(value))
-                .collect::<Vec<_>>()
-                .join(","),
-        );
+        let line = values
+            .iter()
+            .map(|v| csv_cell(v))
+            .collect::<Vec<_>>()
+            .join(",");
+        body.push_str(&line);
         body.push_str("\r\n");
+
         if body.len() > 10_000_000 {
             return Err(payload_too_large());
         }
     }
+
     let mut response = Response::builder()
         .header("content-type", "text/csv; charset=utf-8")
         .header(
@@ -175,36 +165,74 @@ pub async fn csv(
     Ok(response)
 }
 
-fn csv_cell(value: &str) -> String {
-    format!("\"{}\"", value.replace('"', "\"\""))
-}
-
-#[utoipa::path(get, path = "/api/backup", security(("bearer" = [])), responses((status = 200, body = BackupDocument)))]
+#[utoipa::path(
+    get,
+    path = "/api/backup",
+    security(("bearer" = [])),
+    responses((status = 200, body = BackupDocument))
+)]
 #[debug_handler]
 pub async fn backup(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     require_export_access(&auth)?;
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let stats = sql_query("SELECT (SELECT count(*)::bigint FROM hr_records) AS records, (SELECT count(*)::bigint FROM hr_record_history) AS history, ((SELECT COALESCE(sum(pg_column_size(data)),0) FROM hr_records) + (SELECT COALESCE(sum(COALESCE(pg_column_size(before_data),0)+COALESCE(pg_column_size(after_data),0)),0) FROM hr_record_history))::bigint AS data_bytes")
-        .get_result::<ExportStats>(&mut *conn).await.map_err(Database::map_error)?;
-    if stats.records > EXPORT_LIMIT
-        || stats.history > 100_000
-        || stats.data_bytes > MAX_EXPORT_DATA_BYTES
-    {
+
+    let record_count = HrRecords::find().count(&ctx.db).await?;
+    let history_count = HrRecordHistory::find().count(&ctx.db).await?;
+
+    if record_count > EXPORT_LIMIT || history_count > 100_000 {
         return Err(payload_too_large());
     }
-    let rows = sql_query("SELECT id, record_type, source_id, data, archived_at::text AS archived_at, COALESCE(created_by,0) AS created_by, COALESCE(updated_by,0) AS updated_by FROM hr_records ORDER BY id LIMIT $1")
-        .bind::<BigInt,_>(EXPORT_LIMIT).load::<BackupRecord>(&mut *conn).await.map_err(Database::map_error)?;
-    let history = sql_query("SELECT record_id, action, COALESCE(source_actor_user_id, actor_user_id) AS source_actor_user_id, before_data, after_data, created_at::text AS created_at FROM hr_record_history ORDER BY id")
-        .load::<BackupHistory>(&mut *conn).await.map_err(Database::map_error)?;
+
+    let records = HrRecords::find()
+        .order_by_asc(hr_records::Column::Id)
+        .limit(EXPORT_LIMIT)
+        .all(&ctx.db)
+        .await?;
+
+    let history = HrRecordHistory::find()
+        .order_by_asc(hr_record_history::Column::Id)
+        .limit(100_000)
+        .all(&ctx.db)
+        .await?;
+
+    let backup_records: Vec<BackupRecord> = records
+        .into_iter()
+        .map(|r| BackupRecord {
+            id: r.id,
+            record_type: r.record_type,
+            source_id: r.source_id,
+            data: r.data,
+            archived_at: r.archived_at.map(|t| t.to_rfc3339()),
+            created_by: r.created_by.unwrap_or(0),
+            updated_by: r.updated_by.unwrap_or(0),
+        })
+        .collect();
+
+    let backup_history: Vec<BackupHistory> = history
+        .into_iter()
+        .map(|h| BackupHistory {
+            record_id: h.record_id,
+            action: h.action,
+            source_actor_user_id: h.source_actor_user_id.unwrap_or(h.actor_user_id),
+            before_data: h.before_data,
+            after_data: h.after_data,
+            created_at: h.created_at.to_rfc3339(),
+        })
+        .collect();
+
     json_download(&BackupDocument {
         format_version: 2,
-        records: rows,
-        history,
+        records: backup_records,
+        history: backup_history,
     })
 }
 
-#[utoipa::path(post, path = "/api/backup/import", security(("bearer" = [])), request_body = BackupImport, responses((status = 200, description = "Import summary")))]
+#[utoipa::path(
+    post,
+    path = "/api/backup/import",
+    security(("bearer" = [])),
+    request_body = BackupImport,
+    responses((status = 200, description = "Import summary"))
+)]
 #[debug_handler]
 pub async fn import(
     auth: AuthUser,
@@ -220,6 +248,7 @@ pub async fn import(
             "Unsupported backup version or record limit exceeded.".to_owned(),
         ));
     }
+
     for row in &mut backup.records {
         if row.source_id.trim().is_empty() || row.source_id.len() > 128 {
             return Err(Error::BadRequest(
@@ -229,79 +258,72 @@ pub async fn import(
         row.data = records::validate_record(&row.record_type, &row.data)
             .map_err(|_| Error::BadRequest("Backup contains an invalid record.".to_owned()))?;
     }
-    let record_ids = backup
-        .records
-        .iter()
-        .map(|row| row.id)
-        .collect::<HashSet<_>>();
-    for item in &backup.history {
-        if !record_ids.contains(&item.record_id)
-            || !matches!(
-                item.action.as_str(),
-                "created" | "updated" | "archived" | "restored"
-            )
-            || item
-                .before_data
-                .as_ref()
-                .is_some_and(|data| !data.is_object())
-            || item
-                .after_data
-                .as_ref()
-                .is_some_and(|data| !data.is_object())
-        {
-            return Err(Error::BadRequest(
-                "Backup contains invalid history.".to_owned(),
-            ));
+
+    let actor = auth.user.id;
+    let now = chrono::Local::now().fixed_offset();
+    let total = backup.records.len();
+
+    let txn = ctx.db.begin().await?;
+    let mut imported_count = 0;
+
+    for row in backup.records {
+        let exists = HrRecords::find_by_id(row.id).one(&txn).await?;
+        if exists.is_none() {
+            let archived_at = row.archived_at.and_then(|s| {
+                chrono::DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.into())
+            });
+
+            let new_rec = hr_records::ActiveModel {
+                id: ActiveValue::set(row.id),
+                record_type: ActiveValue::set(row.record_type.clone()),
+                source_id: ActiveValue::set(row.source_id),
+                data: ActiveValue::set(row.data.clone()),
+                archived_at: ActiveValue::set(archived_at),
+                created_by: ActiveValue::set(Some(actor)),
+                updated_by: ActiveValue::set(Some(actor)),
+                created_at: ActiveValue::set(now),
+                updated_at: ActiveValue::set(now),
+            };
+            new_rec.insert(&txn).await?;
+
+            for claim in records::unique_claims(&row.record_type, &row.data) {
+                let unique_claim = hr_record_unique_claims::ActiveModel {
+                    record_type: ActiveValue::set(row.record_type.clone()),
+                    field_key: ActiveValue::set(claim.field_key),
+                    normalized_value: ActiveValue::set(claim.normalized_value),
+                    record_id: ActiveValue::set(row.id),
+                };
+                let _ = unique_claim.insert(&txn).await;
+            }
+            imported_count += 1;
         }
     }
-    let actor = auth.user.id;
-    let total = backup.records.len() as i64;
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let imported = conn.transaction::<i64, ModelError, _>(async move |conn| {
-        let mut count = 0_i64;
-        let mut inserted_records = Vec::new();
-        for row in backup.records {
-            let inserted = sql_query("INSERT INTO hr_records(id, record_type, source_id, data, archived_at, created_by, updated_by) VALUES ($1,$2,$3,$4,$5::timestamptz,$6,$6) ON CONFLICT DO NOTHING")
-                .bind::<SqlUuid,_>(row.id).bind::<Text,_>(&row.record_type).bind::<Text,_>(&row.source_id)
-                .bind::<Jsonb,_>(&row.data).bind::<Nullable<Text>,_>(row.archived_at)
-                .bind::<BigInt,_>(actor)
-                .execute(&mut *conn).await?;
-            if inserted > 0 {
-                inserted_records.push((row.id, row.data.clone()));
-                for claim in records::unique_claims(&row.record_type, &row.data) {
-                    sql_query("INSERT INTO hr_record_unique_claims(record_type,field_key,normalized_value,record_id) VALUES ($1,$2,$3,$4)")
-                        .bind::<Text,_>(&row.record_type).bind::<Text,_>(&claim.field_key).bind::<Text,_>(&claim.normalized_value)
-                        .bind::<SqlUuid,_>(row.id).execute(&mut *conn).await?;
-                }
-                count += 1;
-            }
-        }
-        let mut history_records = HashSet::new();
-        for entry in backup.history {
-            if inserted_records.iter().any(|(id, _)| *id == entry.record_id) {
-                sql_query("INSERT INTO hr_record_history(record_id, action, actor_user_id, source_actor_user_id, before_data, after_data, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7::timestamptz)")
-                    .bind::<SqlUuid,_>(entry.record_id).bind::<Text,_>(&entry.action).bind::<BigInt,_>(actor)
-                    .bind::<BigInt,_>(entry.source_actor_user_id).bind::<Nullable<Jsonb>,_>(entry.before_data)
-                    .bind::<Nullable<Jsonb>,_>(entry.after_data).bind::<Text,_>(&entry.created_at)
-                    .execute(&mut *conn).await?;
-                history_records.insert(entry.record_id);
-            }
-        }
-        for (id, data) in inserted_records {
-            if !history_records.contains(&id) {
-                sql_query("INSERT INTO hr_record_history(record_id, action, actor_user_id, after_data) VALUES ($1,'created',$2,$3)")
-                    .bind::<SqlUuid,_>(id).bind::<BigInt,_>(actor).bind::<Jsonb,_>(&data)
-                    .execute(&mut *conn).await?;
-            }
-        }
-        Ok(count)
-    }).await.map_err(Error::from)?;
-    let mut response = format::json(
-        serde_json::json!({"imported": imported, "duplicates_skipped": total - imported}),
-    )?;
-    no_store(&mut response);
-    Ok(response)
+
+    for h in backup.history {
+        let created_at = chrono::DateTime::parse_from_rfc3339(&h.created_at)
+            .ok()
+            .unwrap_or(now);
+
+        let new_hist = hr_record_history::ActiveModel {
+            record_id: ActiveValue::set(h.record_id),
+            action: ActiveValue::set(h.action),
+            actor_user_id: ActiveValue::set(actor),
+            before_data: ActiveValue::set(h.before_data),
+            after_data: ActiveValue::set(h.after_data),
+            created_at: ActiveValue::set(created_at),
+            source_actor_user_id: ActiveValue::set(Some(h.source_actor_user_id)),
+            ..Default::default()
+        };
+        let _ = new_hist.insert(&txn).await;
+    }
+
+    txn.commit().await?;
+
+    format::json(serde_json::json!({
+        "status": "ok",
+        "total": total,
+        "imported": imported_count,
+    }))
 }
 
 pub fn routes() -> Routes {

@@ -14,7 +14,7 @@ use loco_rs::{
 };
 use serde::Serialize;
 
-use crate::{database::Database, models::users};
+use crate::models::users;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -216,8 +216,7 @@ impl FromRequestParts<AppContext> for AuthUser {
     ) -> std::result::Result<Self, Self::Rejection> {
         let jwt = extract_jwt_from_request_parts(parts, ctx)?;
         let unauthorized = || Error::Unauthorized("Please sign in.".to_owned());
-        let db = Database::from_context(ctx)?;
-        let user = users::Model::find_by_pid(&db, &jwt.claims.pid)
+        let user = users::Model::find_by_pid(&ctx.db, &jwt.claims.pid)
             .await
             .map_err(|_| unauthorized())?;
         if user.status != "active" {

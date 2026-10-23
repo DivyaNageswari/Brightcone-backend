@@ -1,0 +1,10 @@
+pub use super::audit_logs::Entity as AuditLogs;
+pub use super::hr_notifications::Entity as HrNotifications;
+pub use super::hr_record_history::Entity as HrRecordHistory;
+pub use super::hr_record_unique_claims::Entity as HrRecordUniqueClaims;
+pub use super::hr_records::Entity as HrRecords;
+pub use super::hr_rule_events::Entity as HrRuleEvents;
+pub use super::hr_rules::Entity as HrRules;
+pub use super::password_resets::Entity as PasswordResets;
+pub use super::refresh_tokens::Entity as RefreshTokens;
+pub use super::users::Entity as Users;

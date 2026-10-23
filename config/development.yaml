@@ -99,6 +99,19 @@ mailer:
 #      - client_identifier: google # Identifier for the OAuth2 provider. Replace 'google' with your provider's name if different, must be unique within the oauth2 config.
 #        ... other fields
 
+
+# Database Configuration
+database:
+  uri: <%= get_env(name="DATABASE_URL", default="postgres://app_runtime:runtime_dev_pw@localhost:5432/brightcone_dev") %>
+  enable_logging: <%= get_env(name="DB_LOGGING", default="false") %>
+  connect_timeout: <%= get_env(name="DB_CONNECT_TIMEOUT", default="5000") %>
+  idle_timeout: <%= get_env(name="DB_IDLE_TIMEOUT", default="500") %>
+  min_connections: <%= get_env(name="DB_MIN_CONNECTIONS", default="1") %>
+  max_connections: <%= get_env(name="DB_MAX_CONNECTIONS", default="10") %>
+  auto_migrate: false
+  dangerously_truncate: false
+  dangerously_recreate: false
+
 # Authentication Configuration
 auth:
   # JWT authentication

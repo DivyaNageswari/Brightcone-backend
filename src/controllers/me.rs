@@ -1,10 +1,8 @@
-//! The signed-in user's own profile and password (ticket P1-07).
 use loco_rs::{hash, prelude::*};
 
 use crate::{
     audit::{self, Entry},
     authz::AuthUser,
-    database::Database,
     models::{refresh_tokens, users::check_password_strength},
     request_meta::RequestMeta,
     session::session_response,
@@ -12,7 +10,6 @@ use crate::{
     views::auth::{ChangePasswordParams, MeResponse},
 };
 
-/// Who am I and what may I do? Called by the frontend after sign-in and after a page reload.
 #[utoipa::path(
     get,
     path = "/api/me",
@@ -24,11 +21,9 @@ use crate::{
 )]
 #[debug_handler]
 pub async fn current(auth: AuthUser, State(_ctx): State<AppContext>) -> Result<Response> {
-    // Every signed-in user may read their own profile, even while a password change is pending.
     format::json(MeResponse::new(&auth.user))
 }
 
-/// Changes the password and signs out every other device. Returns a fresh session for this one.
 #[utoipa::path(
     put,
     path = "/api/me/password",
@@ -47,7 +42,6 @@ pub async fn change_password(
     meta: RequestMeta,
     Json(params): Json<ChangePasswordParams>,
 ) -> Result<Response> {
-    let db = Database::from_context(&ctx)?;
     let settings = AppSettings::from_ctx(&ctx);
     let hash_value = auth.user.password.clone();
     let current = params.current_password.clone();
@@ -66,13 +60,14 @@ pub async fn change_password(
 
     let user = auth
         .user
-        .set_password(&db, &params.new_password, false)
+        .into_active_model()
+        .set_password(&ctx.db, &params.new_password, false)
         .await?;
-    refresh_tokens::Model::revoke_all_for_user(&db, user.id).await?;
+    refresh_tokens::Model::revoke_all_for_user(&ctx.db, user.id).await?;
     let issued =
-        refresh_tokens::Model::issue(&db, &settings, user.id, None, false, meta.ip.clone()).await?;
+        refresh_tokens::Model::issue(&ctx.db, &settings, user.id, None, false, meta.ip.clone()).await?;
     audit::record(
-        &db,
+        &ctx.db,
         Some(&user),
         &meta,
         Entry::new("user.password_changed").target("user", user.pid),

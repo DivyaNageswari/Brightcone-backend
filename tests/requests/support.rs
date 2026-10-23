@@ -4,7 +4,6 @@ use axum::http::{header, HeaderName, HeaderValue};
 use axum_test::{TestResponse, TestServer};
 use brightcone_hr_backend::{
     authz::Role,
-    database::Database,
     models::users::{self, NewUser},
 };
 use loco_rs::prelude::*;
@@ -12,14 +11,13 @@ use serde_json::{json, Value};
 
 pub const PASSWORD: &str = "correct horse battery staple 9";
 
-pub fn database(ctx: &AppContext) -> Database {
-    Database::from_context(ctx).expect("Diesel database is initialized")
+pub fn database(ctx: &AppContext) -> sea_orm::DatabaseConnection {
+    ctx.db.clone()
 }
 
-/// Creates an active account directly in the database.
 pub async fn make_user(ctx: &AppContext, email: &str, role: Role) -> users::Model {
     users::Model::create_with_password(
-        &database(ctx),
+        &ctx.db,
         &NewUser {
             email: email.to_owned(),
             name: "Test Person".to_owned(),
@@ -69,7 +67,6 @@ pub async fn login(request: &TestServer, email: &str) -> TestResponse {
     login_with(request, email, PASSWORD, false).await
 }
 
-/// The full `Set-Cookie` line of a response.
 pub fn set_cookie_line(response: &TestResponse) -> String {
     response
         .headers()
@@ -84,7 +81,6 @@ pub fn set_cookie_line(response: &TestResponse) -> String {
         .expect("response has a brightcone_rt cookie")
 }
 
-/// Just the secret from the refresh cookie.
 pub fn refresh_secret(response: &TestResponse) -> String {
     set_cookie_line(response)
         .split(';')
@@ -101,7 +97,6 @@ pub fn access_token(response: &TestResponse) -> String {
         .to_owned()
 }
 
-/// Signs in and returns `(access_token, refresh_secret)`.
 pub async fn sign_in(request: &TestServer, email: &str) -> (String, String) {
     let response = login(request, email).await;
     assert_eq!(

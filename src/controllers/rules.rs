@@ -1,10 +1,7 @@
-use diesel::{
-    prelude::QueryableByName,
-    sql_query,
-    sql_types::{BigInt, Bool, Text, Uuid as SqlUuid},
-};
-use diesel_async::RunQueryDsl;
 use loco_rs::prelude::*;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -12,16 +9,17 @@ use uuid::Uuid;
 use crate::{
     audit::{self, Entry},
     authz::AuthUser,
-    database::Database,
+    models::_entities::{
+        hr_rule_events::{self, Entity as HrRuleEvents},
+        hr_rules::{self, Entity as HrRules},
+    },
     request_meta::RequestMeta,
     workers::rule_dispatch::{RuleDispatchArgs, RuleDispatchWorker},
 };
 
-#[derive(Debug, Serialize, ToSchema, QueryableByName)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct Rule {
-    #[diesel(sql_type = Text)]
     pub rule_key: String,
-    #[diesel(sql_type = Bool)]
     pub enabled: bool,
 }
 
@@ -30,30 +28,49 @@ pub struct RuleUpdate {
     pub enabled: bool,
 }
 
-#[derive(Debug, Serialize, ToSchema, QueryableByName)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RuleMetrics {
-    #[diesel(sql_type = BigInt)]
     pub pending: i64,
-    #[diesel(sql_type = BigInt)]
     pub complete: i64,
-    #[diesel(sql_type = BigInt)]
     pub failed: i64,
 }
 
-#[utoipa::path(get, path = "/api/rules", security(("bearer" = [])), responses((status = 200, body = [Rule])))]
+#[utoipa::path(
+    get,
+    path = "/api/rules",
+    security(("bearer" = [])),
+    responses((status = 200, body = Vec<Rule>))
+)]
 #[debug_handler]
-pub async fn list(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+pub async fn list(
+    auth: AuthUser,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
     auth.require("rules:manage")?;
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let rules = sql_query("SELECT rule_key, enabled FROM hr_rules ORDER BY rule_key")
-        .load::<Rule>(&mut *conn)
-        .await
-        .map_err(Database::map_error)?;
-    format::json(rules)
+    let rules = HrRules::find()
+        .order_by_asc(hr_rules::Column::RuleKey)
+        .all(&ctx.db)
+        .await?;
+
+    let items: Vec<Rule> = rules
+        .into_iter()
+        .map(|r| Rule {
+            rule_key: r.rule_key,
+            enabled: r.enabled,
+        })
+        .collect();
+
+    format::json(items)
 }
 
-#[utoipa::path(put, path = "/api/rules/{rule_key}", security(("bearer" = [])), request_body = RuleUpdate, responses((status = 200, body = Rule)))]
+#[utoipa::path(
+    put,
+    path = "/api/rules/{rule_key}",
+    security(("bearer" = [])),
+    params(("rule_key" = String, Path, description = "Rule key identifier")),
+    request_body = RuleUpdate,
+    responses((status = 200, body = Rule), (status = 404, description = "Rule not found"))
+)]
 #[debug_handler]
 pub async fn update(
     auth: AuthUser,
@@ -63,80 +80,97 @@ pub async fn update(
     Json(body): Json<RuleUpdate>,
 ) -> Result<Response> {
     auth.require("rules:manage")?;
-    if key.len() > 64 {
-        return Err(Error::BadRequest("Unknown rule.".to_owned()));
-    }
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let mut rows = sql_query("UPDATE hr_rules SET enabled=$2, updated_by=$3, updated_at=now() WHERE rule_key=$1 RETURNING rule_key, enabled")
-        .bind::<Text,_>(key).bind::<Bool,_>(body.enabled).bind::<diesel::sql_types::BigInt,_>(auth.user.id)
-        .load::<Rule>(&mut *conn).await.map_err(Database::map_error)?;
-    let Some(rule) = rows.pop() else {
+    let found = HrRules::find_by_id(&key).one(&ctx.db).await?;
+    let Some(rule) = found else {
         return Err(Error::NotFound);
     };
+
+    let mut active = rule.into_active_model();
+    active.enabled = ActiveValue::set(body.enabled);
+    active.updated_by = ActiveValue::set(Some(auth.user.id));
+    active.updated_at = ActiveValue::set(chrono::Local::now().fixed_offset());
+    let updated = active.update(&ctx.db).await?;
+
     audit::record(
-        &db,
+        &ctx.db,
         Some(&auth.user),
         &meta,
-        Entry::new(if rule.enabled {
-            "rule.enabled"
-        } else {
-            "rule.disabled"
-        })
-        .target("rule", rule.rule_key.clone())
-        .summary(format!("Rule {}", rule.rule_key)),
+        Entry::new("rule.updated")
+            .target("rule", &key)
+            .summary(format!("enabled={}", body.enabled)),
     )
     .await?;
-    format::json(rule)
+
+    format::json(Rule {
+        rule_key: updated.rule_key,
+        enabled: updated.enabled,
+    })
 }
 
-#[utoipa::path(get, path = "/api/rules/metrics", security(("bearer" = [])), responses((status = 200, body = RuleMetrics)))]
+#[utoipa::path(
+    get,
+    path = "/api/rules/metrics",
+    security(("bearer" = [])),
+    responses((status = 200, body = RuleMetrics))
+)]
 #[debug_handler]
-pub async fn metrics(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+pub async fn metrics(
+    auth: AuthUser,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
     auth.require("rules:manage")?;
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let counts = sql_query("SELECT count(*) FILTER (WHERE status='pending')::bigint AS pending, count(*) FILTER (WHERE status='complete')::bigint AS complete, count(*) FILTER (WHERE status='failed')::bigint AS failed FROM hr_rule_events")
-        .get_result::<RuleMetrics>(&mut *conn).await.map_err(Database::map_error)?;
-    format::json(counts)
+    let pending = HrRuleEvents::find()
+        .filter(hr_rule_events::Column::Status.eq("pending"))
+        .count(&ctx.db)
+        .await? as i64;
+    let complete = HrRuleEvents::find()
+        .filter(hr_rule_events::Column::Status.eq("complete"))
+        .count(&ctx.db)
+        .await? as i64;
+    let failed = HrRuleEvents::find()
+        .filter(hr_rule_events::Column::Status.eq("failed"))
+        .count(&ctx.db)
+        .await? as i64;
+
+    format::json(RuleMetrics {
+        pending,
+        complete,
+        failed,
+    })
 }
 
-#[utoipa::path(post, path = "/api/rules/events/{id}/retry", security(("bearer" = [])), responses((status = 202, description = "Retry queued")))]
+#[utoipa::path(
+    post,
+    path = "/api/rules/events/{id}/retry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Event ID")),
+    responses((status = 200, description = "Event enqueued for retry"), (status = 404, description = "Event not found"))
+)]
 #[debug_handler]
 pub async fn retry(
     auth: AuthUser,
     State(ctx): State<AppContext>,
-    meta: RequestMeta,
     Path(id): Path<Uuid>,
 ) -> Result<Response> {
     auth.require("rules:manage")?;
-    let db = Database::from_context(&ctx)?;
-    let mut conn = db.get().await?;
-    let updated = sql_query("UPDATE hr_rule_events SET status='pending', attempts=0, last_error=NULL, completed_at=NULL WHERE event_id=$1 AND status='failed' RETURNING action_key")
-        .bind::<SqlUuid,_>(id).get_result::<RuleKeyRow>(&mut *conn).await;
-    let event = updated.map_err(|error| match error {
-        diesel::result::Error::NotFound => Error::NotFound,
-        other => Database::map_error(other),
-    })?;
-    audit::record(
-        &db,
-        Some(&auth.user),
-        &meta,
-        Entry::new("rule.retry")
-            .target("rule_event", id)
-            .summary(format!("Retry {}", event.action_key)),
-    )
-    .await?;
-    RuleDispatchWorker::perform_later(&ctx, RuleDispatchArgs { event_id: id }).await?;
-    format::render()
-        .status(202)
-        .json(serde_json::json!({"status":"queued"}))
-}
+    let events = HrRuleEvents::find()
+        .filter(hr_rule_events::Column::EventId.eq(id))
+        .all(&ctx.db)
+        .await?;
 
-#[derive(diesel::QueryableByName)]
-struct RuleKeyRow {
-    #[diesel(sql_type = Text)]
-    action_key: String,
+    if events.is_empty() {
+        return Err(Error::NotFound);
+    }
+
+    for ev in events {
+        let mut active = ev.into_active_model();
+        active.status = ActiveValue::set("pending".to_string());
+        active.last_error = ActiveValue::set(None);
+        active.update(&ctx.db).await?;
+    }
+
+    RuleDispatchWorker::perform_later(&ctx, RuleDispatchArgs { event_id: id }).await?;
+    format::json(serde_json::json!({ "status": "retrying" }))
 }
 
 pub fn routes() -> Routes {
