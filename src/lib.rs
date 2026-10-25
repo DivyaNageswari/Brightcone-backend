@@ -4,7 +4,6 @@ pub mod audit;
 pub mod authz;
 pub mod controllers;
 pub mod database;
-pub mod dtos;
 pub mod initializers;
 pub mod mailers;
 pub mod models;

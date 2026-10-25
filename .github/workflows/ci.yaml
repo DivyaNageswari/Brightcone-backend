@@ -31,7 +31,7 @@ jobs:
           --health-retries 10
 
     env:
-      # Same isolated roles and databases as local development (docker/postgres-init/01-roles.sh)
+      # Same isolated roles and databases as local development (native PostgreSQL setup)
       TEST_DATABASE_URL: postgres://app_schema_sync:schema_sync_dev_pw@localhost:5432/brightcone_test
       TEST_QUEUE_URL: postgres://app_queue:queue_dev_pw@localhost:5432/brightcone_test
       DATABASE_URL: postgres://app_runtime:runtime_dev_pw@localhost:5432/brightcone_dev

@@ -24,6 +24,7 @@ impl Initializer for SchemaSyncInitializer {
                 .unwrap_or_else(|_| "postgres://app_schema_sync:schema_sync_dev_pw@localhost:5432/brightcone_test".to_string())
         } else {
             std::env::var("SCHEMA_SYNC_DATABASE_URL")
+                .or_else(|_| std::env::var("DATABASE_URL"))
                 .unwrap_or_else(|_| "postgres://app_schema_sync:schema_sync_dev_pw@localhost:5432/brightcone_dev".to_string())
         };
         let db = Database::connect(&sync_url)

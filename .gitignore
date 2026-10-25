@@ -32,3 +32,5 @@ seed.out
 # it is never committed. See CONTRIBUTING.md for the developer guide instead.
 .claude/
 CLAUDE.md
+
+ui/

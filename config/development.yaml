@@ -67,7 +67,7 @@ queue:
   kind: Postgres
   
   # Postgres connection URI
-  uri: <%= get_env(name="QUEUE_URL", default="postgres://app_queue:queue_dev_pw@localhost:5432/brightcone_dev") %>
+  uri: <%= get_env(name="QUEUE_URL", default=get_env(name="DATABASE_URL", default="postgres://app_queue:queue_dev_pw@localhost:5432/brightcone_dev")) %>
   # Dangerously flush all data in the queue table on startup. dangerous operation, make sure that you using this flag only on dev environments or test mode
   dangerously_flush: false
   
