@@ -145,7 +145,7 @@ impl Hooks for App {
         Ok(ctx)
     }
 
-        async fn truncate(_ctx: &AppContext) -> Result<()> {
+    async fn truncate(_ctx: &AppContext) -> Result<()> {
         Ok(())
     }
 
@@ -153,9 +153,7 @@ impl Hooks for App {
         Ok(())
     }
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
-        Ok(vec![Box::new(
-            crate::initializers::SchemaSyncInitializer,
-        )])
+        Ok(vec![Box::new(crate::initializers::SchemaSyncInitializer)])
     }
 
     fn routes(ctx: &AppContext) -> AppRoutes {

@@ -5,8 +5,8 @@ use brightcone_hr_backend::{
     models::audit_logs,
     request_meta::RequestMeta,
 };
-use sea_orm::{ConnectionTrait, EntityTrait};
 use loco_rs::testing::prelude::*;
+use sea_orm::{ConnectionTrait, EntityTrait};
 use serde_json::Value;
 use serial_test::serial;
 
@@ -116,7 +116,10 @@ async fn audit_rows_cannot_be_changed_or_deleted_even_by_the_table_owner() {
         .await
         .unwrap();
 
-        let update = ctx.db.execute_unprepared("UPDATE audit_logs SET action = 'tampered'").await;
+        let update = ctx
+            .db
+            .execute_unprepared("UPDATE audit_logs SET action = 'tampered'")
+            .await;
         assert!(update.is_err(), "UPDATE must be blocked by the trigger");
         let delete = ctx.db.execute_unprepared("DELETE FROM audit_logs").await;
         assert!(delete.is_err(), "DELETE must be blocked by the trigger");

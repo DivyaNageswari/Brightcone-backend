@@ -26,7 +26,10 @@ fn main() -> io::Result<()> {
     let root = std::env::current_dir()?;
     let mut files = Vec::new();
     for directory in CODE_DIRECTORIES {
-        rust_sources(&root.join(directory), &mut files)?;
+        let dir = root.join(directory);
+        if dir.is_dir() {
+            rust_sources(&dir, &mut files)?;
+        }
     }
     let build_script = root.join("build.rs");
     if build_script.is_file() {

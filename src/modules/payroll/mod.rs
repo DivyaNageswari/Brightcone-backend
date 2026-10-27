@@ -28,7 +28,6 @@ pub struct PayrollRun {
     pub created_at: String,
 }
 
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AttendanceSyncItem {
     pub employee_id: String,
@@ -90,20 +89,104 @@ pub struct PayrollStore {
 impl PayrollStore {
     pub fn new() -> Self {
         let employees = vec![
-            EmployeeSalaryRecord { id: "BC-1001".into(), name: "Ananya Rao".into(), email: "ananya.rao@brightcone.ai".into(), dept: "People Ops".into(), gross: 145000.0 },
-            EmployeeSalaryRecord { id: "BC-1002".into(), name: "Naresh Vemparala".into(), email: "naresh.vemparala@brightcone.ai".into(), dept: "Operations".into(), gross: 180000.0 },
-            EmployeeSalaryRecord { id: "BC-1003".into(), name: "Karthik Reddy".into(), email: "karthik.reddy@brightcone.ai".into(), dept: "Engineering".into(), gross: 240000.0 },
-            EmployeeSalaryRecord { id: "BC-1004".into(), name: "Priya Menon".into(), email: "priya.menon@brightcone.ai".into(), dept: "Product".into(), gross: 170000.0 },
-            EmployeeSalaryRecord { id: "BC-1005".into(), name: "Meera Joshi".into(), email: "meera.joshi@brightcone.ai".into(), dept: "Finance".into(), gross: 160000.0 },
-            EmployeeSalaryRecord { id: "BC-1006".into(), name: "Rahul Varma".into(), email: "rahul.varma@brightcone.ai".into(), dept: "Engineering".into(), gross: 195000.0 },
-            EmployeeSalaryRecord { id: "BC-1007".into(), name: "Sneha Iyer".into(), email: "sneha.iyer@brightcone.ai".into(), dept: "Design".into(), gross: 85000.0 },
-            EmployeeSalaryRecord { id: "BC-1008".into(), name: "Arjun Nair".into(), email: "arjun.nair@brightcone.ai".into(), dept: "Sales".into(), gross: 90000.0 },
-            EmployeeSalaryRecord { id: "BC-1009".into(), name: "Daniel Brooks".into(), email: "daniel.brooks@brightcone.ai".into(), dept: "Engineering".into(), gross: 105000.0 },
-            EmployeeSalaryRecord { id: "BC-1010".into(), name: "Emily Carter".into(), email: "emily.carter@brightcone.ai".into(), dept: "Marketing".into(), gross: 95000.0 },
-            EmployeeSalaryRecord { id: "BC-1011".into(), name: "Vikram Singh".into(), email: "vikram.singh@brightcone.ai".into(), dept: "Engineering".into(), gross: 110000.0 },
-            EmployeeSalaryRecord { id: "BC-1012".into(), name: "Lakshmi Prasad".into(), email: "lakshmi.prasad@brightcone.ai".into(), dept: "Support".into(), gross: 80000.0 },
-            EmployeeSalaryRecord { id: "BC-1013".into(), name: "Farhan Ali".into(), email: "farhan.ali@brightcone.ai".into(), dept: "Operations".into(), gross: 75000.0 },
-            EmployeeSalaryRecord { id: "BC-1014".into(), name: "Divya Kulkarni".into(), email: "divya.kulkarni@brightcone.ai".into(), dept: "Marketing".into(), gross: 125000.0 },
+            EmployeeSalaryRecord {
+                id: "BC-1001".into(),
+                name: "Ananya Rao".into(),
+                email: "ananya.rao@brightcone.ai".into(),
+                dept: "People Ops".into(),
+                gross: 145000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1002".into(),
+                name: "Naresh Vemparala".into(),
+                email: "naresh.vemparala@brightcone.ai".into(),
+                dept: "Operations".into(),
+                gross: 180000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1003".into(),
+                name: "Karthik Reddy".into(),
+                email: "karthik.reddy@brightcone.ai".into(),
+                dept: "Engineering".into(),
+                gross: 240000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1004".into(),
+                name: "Priya Menon".into(),
+                email: "priya.menon@brightcone.ai".into(),
+                dept: "Product".into(),
+                gross: 170000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1005".into(),
+                name: "Meera Joshi".into(),
+                email: "meera.joshi@brightcone.ai".into(),
+                dept: "Finance".into(),
+                gross: 160000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1006".into(),
+                name: "Rahul Varma".into(),
+                email: "rahul.varma@brightcone.ai".into(),
+                dept: "Engineering".into(),
+                gross: 195000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1007".into(),
+                name: "Sneha Iyer".into(),
+                email: "sneha.iyer@brightcone.ai".into(),
+                dept: "Design".into(),
+                gross: 85000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1008".into(),
+                name: "Arjun Nair".into(),
+                email: "arjun.nair@brightcone.ai".into(),
+                dept: "Sales".into(),
+                gross: 90000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1009".into(),
+                name: "Daniel Brooks".into(),
+                email: "daniel.brooks@brightcone.ai".into(),
+                dept: "Engineering".into(),
+                gross: 105000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1010".into(),
+                name: "Emily Carter".into(),
+                email: "emily.carter@brightcone.ai".into(),
+                dept: "Marketing".into(),
+                gross: 95000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1011".into(),
+                name: "Vikram Singh".into(),
+                email: "vikram.singh@brightcone.ai".into(),
+                dept: "Engineering".into(),
+                gross: 110000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1012".into(),
+                name: "Lakshmi Prasad".into(),
+                email: "lakshmi.prasad@brightcone.ai".into(),
+                dept: "Support".into(),
+                gross: 80000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1013".into(),
+                name: "Farhan Ali".into(),
+                email: "farhan.ali@brightcone.ai".into(),
+                dept: "Operations".into(),
+                gross: 75000.0,
+            },
+            EmployeeSalaryRecord {
+                id: "BC-1014".into(),
+                name: "Divya Kulkarni".into(),
+                email: "divya.kulkarni@brightcone.ai".into(),
+                dept: "Marketing".into(),
+                gross: 125000.0,
+            },
         ];
 
         let mut total_gross = 0.0;
@@ -189,10 +272,14 @@ pub async fn get_active_run(State(store): State<PayrollStore>) -> Json<PayrollRu
     Json(s.active_run.clone())
 }
 
-pub async fn get_attendance_sync(State(store): State<PayrollStore>) -> Json<Vec<AttendanceSyncItem>> {
+pub async fn get_attendance_sync(
+    State(store): State<PayrollStore>,
+) -> Json<Vec<AttendanceSyncItem>> {
     let s = store.state.read().await;
-    let items = s.employees.iter().map(|e| {
-        AttendanceSyncItem {
+    let items = s
+        .employees
+        .iter()
+        .map(|e| AttendanceSyncItem {
             employee_id: e.id.clone(),
             employee_name: e.name.clone(),
             department: e.dept.clone(),
@@ -201,45 +288,53 @@ pub async fn get_attendance_sync(State(store): State<PayrollStore>) -> Json<Vec<
             paid_leaves: 1,
             lop_days: 0,
             payable_days: 31,
-        }
-    }).collect();
+        })
+        .collect();
     Json(items)
 }
 
 pub async fn get_variances(State(store): State<PayrollStore>) -> Json<Vec<VarianceItem>> {
     let s = store.state.read().await;
-    let items = s.employees.iter().map(|e| {
-        let b = compute_salary_in_paise(e.gross, true, "new");
-        VarianceItem {
-            employee_id: e.id.clone(),
-            employee_name: e.name.clone(),
-            department: e.dept.clone(),
-            previous_net: b.net_take_home_rupees,
-            current_net: b.net_take_home_rupees,
-            variance_amount: 0.0,
-            variance_pct: 0.0,
-            flagged: false,
-            reason: "Standard monthly salary without LOP".into(),
-        }
-    }).collect();
+    let items = s
+        .employees
+        .iter()
+        .map(|e| {
+            let b = compute_salary_in_paise(e.gross, true, "new");
+            VarianceItem {
+                employee_id: e.id.clone(),
+                employee_name: e.name.clone(),
+                department: e.dept.clone(),
+                previous_net: b.net_take_home_rupees,
+                current_net: b.net_take_home_rupees,
+                variance_amount: 0.0,
+                variance_pct: 0.0,
+                flagged: false,
+                reason: "Standard monthly salary without LOP".into(),
+            }
+        })
+        .collect();
     Json(items)
 }
 
 pub async fn get_register(State(store): State<PayrollStore>) -> Json<Vec<RegisterItem>> {
     let s = store.state.read().await;
-    let items = s.employees.iter().map(|e| {
-        let b = compute_salary_in_paise(e.gross, true, "new");
-        RegisterItem {
-            emp_id: e.id.clone(),
-            name: e.name.clone(),
-            dept: e.dept.clone(),
-            gross: b.gross_monthly_rupees,
-            pf: b.employee_pf_rupees,
-            pt: b.professional_tax_rupees,
-            tds: b.estimated_tds_rupees,
-            net: b.net_take_home_rupees,
-        }
-    }).collect();
+    let items = s
+        .employees
+        .iter()
+        .map(|e| {
+            let b = compute_salary_in_paise(e.gross, true, "new");
+            RegisterItem {
+                emp_id: e.id.clone(),
+                name: e.name.clone(),
+                dept: e.dept.clone(),
+                gross: b.gross_monthly_rupees,
+                pf: b.employee_pf_rupees,
+                pt: b.professional_tax_rupees,
+                tds: b.estimated_tds_rupees,
+                net: b.net_take_home_rupees,
+            }
+        })
+        .collect();
     Json(items)
 }
 
@@ -273,7 +368,10 @@ pub async fn publish_and_lock(
     Ok(Json(PublishResponse {
         success: true,
         run: s.active_run.clone(),
-        message: format!("{} payroll run locked and disbursed successfully", s.active_run.month),
+        message: format!(
+            "{} payroll run locked and disbursed successfully",
+            s.active_run.month
+        ),
     }))
 }
 
@@ -286,6 +384,9 @@ pub fn router() -> Router {
         .route("/api/payroll/variances", get(get_variances))
         .route("/api/payroll/register", get(get_register))
         .route("/api/payroll/runs/{id}/advance-step", post(advance_step))
-        .route("/api/payroll/runs/{id}/publish-and-lock", post(publish_and_lock))
+        .route(
+            "/api/payroll/runs/{id}/publish-and-lock",
+            post(publish_and_lock),
+        )
         .with_state(store)
 }

@@ -149,7 +149,9 @@ pub async fn create(
             axum::http::StatusCode::CONFLICT,
             loco_rs::controller::ErrorDetail::new("conflict", "That email is already in use."),
         ),
-        crate::models::error::ModelError::Validation(_) => Error::BadRequest("Check the name and email.".to_owned()),
+        crate::models::error::ModelError::Validation(_) => {
+            Error::BadRequest("Check the name and email.".to_owned())
+        }
         other => other.into(),
     })?;
     audit::record(

@@ -1,7 +1,6 @@
 use loco_rs::prelude::*;
 use sea_orm::{
-    sea_query::PostgresQueryBuilder,
-    ConnectionTrait, DatabaseConnection, DbBackend, Schema,
+    sea_query::PostgresQueryBuilder, ConnectionTrait, DatabaseConnection, DbBackend, Schema,
 };
 use tracing::info;
 
@@ -14,15 +13,27 @@ pub struct Table {
 
 pub const TABLES: &[Table] = &[
     Table { name: "users" },
-    Table { name: "refresh_tokens" },
-    Table { name: "password_resets" },
+    Table {
+        name: "refresh_tokens",
+    },
+    Table {
+        name: "password_resets",
+    },
     Table { name: "audit_logs" },
     Table { name: "hr_records" },
-    Table { name: "hr_record_history" },
-    Table { name: "hr_record_unique_claims" },
+    Table {
+        name: "hr_record_history",
+    },
+    Table {
+        name: "hr_record_unique_claims",
+    },
     Table { name: "hr_rules" },
-    Table { name: "hr_rule_events" },
-    Table { name: "hr_notifications" },
+    Table {
+        name: "hr_rule_events",
+    },
+    Table {
+        name: "hr_notifications",
+    },
 ];
 
 pub async fn run_autonomous_sync(db: &DatabaseConnection) -> Result<(), String> {

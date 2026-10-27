@@ -1,5 +1,7 @@
 use loco_rs::prelude::*;
-use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+};
 use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -32,10 +34,7 @@ pub struct NotificationPage {
     responses((status = 200, body = NotificationPage))
 )]
 #[debug_handler]
-pub async fn list(
-    auth: AuthUser,
-    State(ctx): State<AppContext>,
-) -> Result<Response> {
+pub async fn list(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     let unread_count = HrNotifications::find()
         .filter(hr_notifications::Column::UserId.eq(auth.user.id))
         .filter(hr_notifications::Column::ReadAt.is_null())

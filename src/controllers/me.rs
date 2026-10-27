@@ -65,7 +65,8 @@ pub async fn change_password(
         .await?;
     refresh_tokens::Model::revoke_all_for_user(&ctx.db, user.id).await?;
     let issued =
-        refresh_tokens::Model::issue(&ctx.db, &settings, user.id, None, false, meta.ip.clone()).await?;
+        refresh_tokens::Model::issue(&ctx.db, &settings, user.id, None, false, meta.ip.clone())
+            .await?;
     audit::record(
         &ctx.db,
         Some(&user),

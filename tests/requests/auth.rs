@@ -7,13 +7,12 @@ use brightcone_hr_backend::{
         users::{self},
     },
 };
-use sea_orm::EntityTrait;
 use loco_rs::testing::prelude::*;
+use sea_orm::EntityTrait;
 use serde_json::{json, Value};
 use serial_test::serial;
 
 use super::support::*;
-
 
 #[tokio::test]
 #[serial]

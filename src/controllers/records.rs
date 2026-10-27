@@ -3,8 +3,6 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
     TransactionTrait,
 };
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -18,76 +16,18 @@ use crate::{
     rule_engine::{self, RuleEventPayload},
 };
 
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct RecordInput {
-    pub source_id: String,
-    pub data: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct RecordUpdateInput {
-    pub data: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct Record {
-    pub id: Uuid,
-    pub record_type: String,
-    pub source_id: String,
-    pub data: serde_json::Value,
-    pub archived_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-impl From<hr_records::Model> for Record {
-    fn from(m: hr_records::Model) -> Self {
-        Self {
-            id: m.id,
-            record_type: m.record_type,
-            source_id: m.source_id,
-            data: m.data,
-            archived_at: m.archived_at.map(|t| t.to_rfc3339()),
-            created_at: m.created_at.to_rfc3339(),
-            updated_at: m.updated_at.to_rfc3339(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct RecordPage {
-    pub items: Vec<Record>,
-}
-
-pub type HistoryEntry = RecordHistory;
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct RecordHistory {
-    pub id: i64,
-    pub record_id: Uuid,
-    pub action: String,
-    pub actor_user_id: i64,
-    pub before_data: Option<serde_json::Value>,
-    pub after_data: Option<serde_json::Value>,
-    pub created_at: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListQuery {
-    pub limit: Option<u64>,
-    pub include_archived: Option<bool>,
-}
+#[path = "records/types.rs"]
+mod types;
+pub use types::*;
 
 fn require_hr(auth: &AuthUser) -> Result<()> {
     auth.require("records:manage").map(|_| ())
 }
 
 fn validate_type(record_type: &str) -> Result<()> {
-    if records::is_registered(record_type) {
-        Ok(())
-    } else {
-        Err(Error::BadRequest("Unknown record type.".to_owned()))
-    }
+    records::is_registered(record_type)
+        .then_some(())
+        .ok_or_else(|| Error::BadRequest("Unknown record type.".to_owned()))
 }
 
 fn validate_input(record_type: &str, input: &RecordInput) -> Result<serde_json::Value> {
@@ -208,11 +148,15 @@ pub async fn create(
     }
 
     let event_id = if let Some(key) = rule_engine::event_key(&kind, "created", None, &data) {
-        rule_engine::record_event(&txn, key, &RuleEventPayload {
-            record_id: id,
-            record_type: kind.clone(),
-            actor_user_id: actor,
-        })
+        rule_engine::record_event(
+            &txn,
+            key,
+            &RuleEventPayload {
+                record_id: id,
+                record_type: kind.clone(),
+                actor_user_id: actor,
+            },
+        )
         .await?
     } else {
         None
@@ -220,7 +164,9 @@ pub async fn create(
 
     txn.commit().await?;
     rule_engine::dispatch(&ctx, event_id).await;
-    format::render().status(201).json(Record::from(saved_record))
+    format::render()
+        .status(201)
+        .json(Record::from(saved_record))
 }
 
 async fn change(
@@ -242,8 +188,9 @@ async fn change(
     };
 
     let new_data = match input {
-        Some(value) => records::validate_record(&old.record_type, &value)
-            .map_err(Error::BadRequest)?,
+        Some(value) => {
+            records::validate_record(&old.record_type, &value).map_err(Error::BadRequest)?
+        }
         None => old.data.clone(),
     };
 
@@ -295,17 +242,18 @@ async fn change(
     };
     hist.insert(&txn).await?;
 
-    let event_id = if let Some(key) = rule_engine::event_key(
-        &old.record_type,
-        action,
-        Some(&old.data),
-        &new_data,
-    ) {
-        rule_engine::record_event(&txn, key, &RuleEventPayload {
-            record_id: updated.id,
-            record_type: old.record_type.clone(),
-            actor_user_id: actor,
-        })
+    let event_id = if let Some(key) =
+        rule_engine::event_key(&old.record_type, action, Some(&old.data), &new_data)
+    {
+        rule_engine::record_event(
+            &txn,
+            key,
+            &RuleEventPayload {
+                record_id: updated.id,
+                record_type: old.record_type.clone(),
+                actor_user_id: actor,
+            },
+        )
         .await?
     } else {
         None

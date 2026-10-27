@@ -42,19 +42,31 @@ Generate a unique local signing secret and put it in ignored `.env`:
 openssl rand -base64 48
 ```
 
-Initialize your native PostgreSQL database:
+Initialize your native PostgreSQL database, then create local demo accounts
+before trying to sign in. Schema sync creates the tables but intentionally does
+not create user accounts. Run these commands from the API directory in
+PowerShell:
+
 ```powershell
 psql -U postgres -p 5432 -f scripts/setup_postgres_native.sql
-make run        # API on http://localhost:5150
-# In another terminal, optionally create local-only demo accounts:
-make seed       # prints temporary passwords to terminal
+cargo loco task seed_demo # creates local demo accounts and prints their passwords
+cargo loco start --server-and-worker # API on http://localhost:5150
 ```
+
+Save the passwords printed by `seed_demo`; they are needed to sign in. The task
+refuses to run in production. For an existing account, its password is reset by
+the seed task and the replacement is printed.
+To reset only Ananya's local demo account (HR Admin), use
+`cargo loco task seed_demo email:ananya.rao@brightcone.ai`; this also unlocks
+the account and revokes its existing refresh sessions.
 
 The API applies additive schema sync at startup. `SCHEMA_SYNC_DATABASE_URL` must
 identify a PostgreSQL role permitted to create tables, add columns, and create
 indexes. The API uses the lower-privilege `DATABASE_URL` for normal queries.
 In production, provision these credentials separately; schema sync never drops
 tables or columns. Review `src/database/schema/manifest.rs` before deploying schema changes.
+The seed task creates accounts using the database configured by `DATABASE_URL`;
+make sure it points to the same local database used by the running API.
 
 The Vite frontend defaults to proxying `/api` to `http://localhost:5150`.
 

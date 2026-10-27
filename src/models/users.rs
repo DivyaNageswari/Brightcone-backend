@@ -1,7 +1,7 @@
-use sea_orm::TransactionSession;
 use async_trait::async_trait;
 use chrono::Local;
 use loco_rs::{auth::jwt, hash, prelude::*};
+use sea_orm::TransactionSession;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use serde_json::Map;
 use uuid::Uuid;
@@ -120,7 +120,7 @@ impl Model {
         active.failed_logins = ActiveValue::set(0);
         active.last_login_at = ActiveValue::set(Some(Local::now().into()));
         Ok(active.update(db).await?)
-    }
+    }
 
     pub async fn set_password<C: ConnectionTrait>(
         &self,
@@ -136,11 +136,7 @@ impl Model {
         Ok(active.update(db).await?)
     }
 
-    pub async fn set_status<C: ConnectionTrait>(
-        &self,
-        db: &C,
-        status: &str,
-    ) -> ModelResult<Self> {
+    pub async fn set_status<C: ConnectionTrait>(&self, db: &C, status: &str) -> ModelResult<Self> {
         let mut active = self.clone().into_active_model();
         active.status = ActiveValue::set(status.to_owned());
         active.failed_logins = ActiveValue::set(0);

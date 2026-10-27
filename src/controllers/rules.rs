@@ -1,7 +1,5 @@
 use loco_rs::prelude::*;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
-};
+use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -42,10 +40,7 @@ pub struct RuleMetrics {
     responses((status = 200, body = Vec<Rule>))
 )]
 #[debug_handler]
-pub async fn list(
-    auth: AuthUser,
-    State(ctx): State<AppContext>,
-) -> Result<Response> {
+pub async fn list(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     auth.require("rules:manage")?;
     let rules = HrRules::find()
         .order_by_asc(hr_rules::Column::RuleKey)
@@ -114,10 +109,7 @@ pub async fn update(
     responses((status = 200, body = RuleMetrics))
 )]
 #[debug_handler]
-pub async fn metrics(
-    auth: AuthUser,
-    State(ctx): State<AppContext>,
-) -> Result<Response> {
+pub async fn metrics(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     auth.require("rules:manage")?;
     let pending = HrRuleEvents::find()
         .filter(hr_rule_events::Column::Status.eq("pending"))

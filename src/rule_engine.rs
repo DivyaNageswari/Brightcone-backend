@@ -1,7 +1,6 @@
 use loco_rs::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -242,7 +241,9 @@ pub async fn record_failure(ctx: &AppContext, event_id: Uuid) -> Result<()> {
 
     for ev in events {
         let mut active = ev.into_active_model();
-        active.last_error = ActiveValue::set(Some("Rule action failed; see application logs.".to_string()));
+        active.last_error = ActiveValue::set(Some(
+            "Rule action failed; see application logs.".to_string(),
+        ));
         if active.attempts.as_ref() >= &5 {
             active.status = ActiveValue::set("failed".to_string());
         }

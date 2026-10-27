@@ -1,8 +1,7 @@
-
 use loco_rs::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -270,7 +269,9 @@ pub async fn import(
         let exists = HrRecords::find_by_id(row.id).one(&txn).await?;
         if exists.is_none() {
             let archived_at = row.archived_at.and_then(|s| {
-                chrono::DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.into())
+                chrono::DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.into())
             });
 
             let new_rec = hr_records::ActiveModel {
